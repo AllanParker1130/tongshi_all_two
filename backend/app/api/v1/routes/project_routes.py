@@ -6,10 +6,10 @@ from app.db.session import get_db
 from app.core.security import get_current_user
 from app.core.response import success
 from app.core.exceptions import BusinessException
-from app.schemas.common import AuthUser, ProjectCreate
+from app.schemas.common import AuthUser, ProjectCreate, ProjectUpdate
 from app.services.project_service import (
     list_approved_projects, get_project, get_user_projects,
-    create_project, toggle_like,
+    create_project, toggle_like, update_project,
 )
 from app.models.entities import User
 
@@ -18,13 +18,19 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 def _format_project(db: Session, p):
     author = db.query(User).filter(User.id == p.author_id).first()
+    images = [
+        {"id": image.id, "image_url": image.image_url, "sort_order": image.sort_order}
+        for image in sorted(p.images, key=lambda item: (item.sort_order, item.id))
+    ]
+    if not images and p.image_url:
+        images = [{"image_url": p.image_url, "sort_order": 0}]
     return {
         "id": p.id, "title": p.title, "author_id": p.author_id,
         "author_name": author.name if author else "",
         "major": p.major, "description": p.description,
         "tags": p.tags, "likes": p.likes, "featured": p.featured,
         "video_url": p.video_url, "report_url": p.report_url,
-        "image_url": p.image_url, "link_url": getattr(p, "link_url", ""),
+        "image_url": p.image_url, "images": images, "link_url": getattr(p, "link_url", ""),
         "status": p.status,
         "reject_reason": p.reject_reason, "date": p.date,
     }
@@ -53,6 +59,19 @@ def get_project_detail(project_id: int, db: Session = Depends(get_db), _: AuthUs
 @router.post("", summary="提交作品", description="学生端：提交新的 AI 项目作品")
 def create_new_project(data: ProjectCreate, db: Session = Depends(get_db), current_user: AuthUser = Depends(get_current_user)):
     p = create_project(db, current_user.id, data.model_dump())
+    return success({"id": p.id})
+
+
+@router.put("/{project_id}", summary="修改后重新提交作品", description="学生端：修改被驳回的原作品并重新提交审核")
+def update_existing_project(
+    project_id: int,
+    data: ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(get_current_user),
+):
+    p = update_project(db, project_id, current_user.id, data.model_dump())
+    if not p:
+        raise BusinessException(404, "作品不存在")
     return success({"id": p.id})
 
 

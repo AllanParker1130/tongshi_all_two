@@ -1,5 +1,11 @@
 import http from './http'
 
+export interface ProjectImage {
+  id?: number
+  image_url: string
+  sort_order?: number
+}
+
 export interface Project {
   id: number
   title: string
@@ -13,10 +19,22 @@ export interface Project {
   video_url: string
   report_url: string
   image_url: string
+  images?: ProjectImage[]
   link_url: string
   status: string
   reject_reason: string
   date: string
+}
+
+export interface ProjectPayload {
+  title: string
+  description: string
+  tags: string[]
+  video_url?: string
+  report_url?: string
+  image_url?: string
+  image_urls?: string[]
+  link_url?: string
 }
 
 export function getProjects() {
@@ -31,8 +49,12 @@ export function getMyProjects() {
   return http.get<any, Project[]>('/projects/mine')
 }
 
-export function createProject(data: { title: string; description: string; tags: string[]; video_url?: string; report_url?: string; image_url?: string; link_url?: string }) {
+export function createProject(data: ProjectPayload) {
   return http.post<any, { id: number }>('/projects', data)
+}
+
+export function updateProject(id: number, data: ProjectPayload) {
+  return http.put<any, { id: number }>(`/projects/${id}`, data)
 }
 
 export function toggleLike(projectId: number) {

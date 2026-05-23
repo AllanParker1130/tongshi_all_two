@@ -62,4 +62,6 @@ def list_all_projects(db: Session, status: str = None):
     query = db.query(Project)
     if status:
         query = query.filter(Project.status == status)
+    else:
+        query = query.filter(Project.status.in_(["pending", "approved"]))
     return query.order_by(Project.date.desc()).all()

@@ -1,17 +1,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getChapters, type Chapter } from '@/api/chapter'
 import { getQuestions, createQuestion, updateQuestion, deleteQuestion as apiDeleteQuestion, importQuestions, type Question } from '@/api/question'
 
-const chapterNames: Record<number, string> = {
-  1: '人工智能概述',
-  2: '计算机基础知识',
-  3: 'AI 理论基础',
-  4: 'AI 工具使用',
-  5: 'AI 前沿与应用',
-  6: 'AI 伦理与未来',
-}
-
+const chapters = ref<Chapter[]>([])
 const questions = ref<Question[]>([])
 const loading = ref(true)
 
@@ -21,7 +14,7 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
 const newQuestion = reactive({
-  chapter: 1,
+  chapter: '' as number | '',
   type: 'choice' as 'choice' | 'fill',
   stem: '',
   options: ['', '', '', ''],
@@ -31,7 +24,9 @@ const newQuestion = reactive({
 
 onMounted(async () => {
   try {
-    questions.value = await getQuestions()
+    const [questionList, chapterList] = await Promise.all([getQuestions(), getChapters()])
+    questions.value = questionList
+    chapters.value = chapterList
   } catch {
     ElMessage.error('题库数据加载失败，请稍后重试')
   } finally {
@@ -47,9 +42,26 @@ const filteredQuestions = computed(() => {
   })
 })
 
+function getChapterLabel(chapterId: number) {
+  const chapter = chapters.value.find(item => item.id === chapterId)
+  if (!chapter) return `章节 ${chapterId}`
+  return `${chapter.num} ${chapter.title}`
+}
+
+function getDefaultChapterId() {
+  return chapters.value[0]?.id || ''
+}
+
 function openNew() {
   editingId.value = null
-  Object.assign(newQuestion, { chapter: 1, type: 'choice', stem: '', options: ['', '', '', ''], answer: '', explanation: '' })
+  Object.assign(newQuestion, {
+    chapter: getDefaultChapterId(),
+    type: 'choice',
+    stem: '',
+    options: ['', '', '', ''],
+    answer: '',
+    explanation: '',
+  })
   dialogVisible.value = true
 }
 
@@ -67,6 +79,10 @@ function openEdit(q: Question) {
 }
 
 async function handleSave() {
+  if (typeof newQuestion.chapter !== 'number') {
+    ElMessage.warning('请先创建章节')
+    return
+  }
   if (!newQuestion.stem.trim() || !newQuestion.answer.trim()) {
     ElMessage.warning('请填写题干和答案')
     return
@@ -157,7 +173,12 @@ async function handleImport() {
 
     <div class="filter-bar">
       <el-select v-model="filterChapter" placeholder="全部章节" clearable size="default" style="width: 180px">
-        <el-option v-for="(name, id) in chapterNames" :key="id" :label="name" :value="Number(id)" />
+        <el-option
+          v-for="chapter in chapters"
+          :key="chapter.id"
+          :label="`${chapter.num} ${chapter.title}`"
+          :value="chapter.id"
+        />
       </el-select>
       <el-select v-model="filterType" placeholder="全部题型" clearable size="default" style="width: 140px">
         <el-option label="选择题" value="choice" />
@@ -182,7 +203,7 @@ async function handleImport() {
       </el-table-column>
       <el-table-column label="章节" width="140">
         <template #default="{ row }">
-          {{ chapterNames[row.chapter_id] }}
+          {{ getChapterLabel(row.chapter_id) }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
@@ -202,7 +223,12 @@ async function handleImport() {
       <div class="form-group">
         <label>章节</label>
         <el-select v-model="newQuestion.chapter" size="large" style="width: 100%">
-          <el-option v-for="(name, id) in chapterNames" :key="id" :label="name" :value="Number(id)" />
+          <el-option
+            v-for="chapter in chapters"
+            :key="chapter.id"
+            :label="`${chapter.num} ${chapter.title}`"
+            :value="chapter.id"
+          />
         </el-select>
       </div>
       <div class="form-group">
@@ -245,7 +271,7 @@ async function handleImport() {
           <thead><tr><th>type</th><th>chapter</th><th>stem</th><th>options</th><th>answer</th><th>explanation</th></tr></thead>
           <tbody><tr><td>choice</td><td>01</td><td>图灵测试由谁提出？</td><td>A. xxx|B. xxx|C. xxx|D. xxx</td><td>A</td><td>解析内容</td></tr></tbody>
         </table>
-        <p class="import-note">type 为 choice 或 fill，chapter 填章节编号（如 01），填空题 options 留空。</p>
+        <p class="import-note">type 为 choice 或 fill，chapter 填章节编号或章节标题，填空题 options 留空。</p>
       </div>
       <div class="upload-zone-import" @click="importInput?.click()">
         <input ref="importInput" type="file" accept=".xlsx,.xls" hidden @change="handleImportFile" />

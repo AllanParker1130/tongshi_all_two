@@ -1,11 +1,28 @@
 """Project service"""
 import logging
 from datetime import datetime
+
 from sqlalchemy.orm import Session
 
-from app.models.entities import Project, ProjectLike, User
+from app.core.exceptions import BusinessException
+from app.models.entities import Project, ProjectImage, ProjectLike, User
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_project_images(data: dict) -> list[str]:
+    image_urls = [str(item).strip() for item in (data.get("image_urls") or []) if str(item).strip()]
+    single = str(data.get("image_url", "")).strip()
+    if not image_urls and single:
+        image_urls = [single]
+    return image_urls[:3]
+
+
+def sync_project_images(project: Project, image_urls: list[str]) -> None:
+    project.images.clear()
+    for index, image_url in enumerate(image_urls):
+        project.images.append(ProjectImage(image_url=image_url, sort_order=index))
+    project.image_url = image_urls[0] if image_urls else ""
 
 
 def list_approved_projects(db: Session):
@@ -23,21 +40,48 @@ def get_user_projects(db: Session, user_id: str):
 def create_project(db: Session, user_id: str, data: dict):
     user = db.query(User).filter(User.id == user_id).first()
     project = Project(
-        author_id=user_id,
-        major=user.major if user else "",
-        date=datetime.now().strftime("%Y-%m-%d"),
-        title=data.get("title"),
-        description=data.get("description", ""),
-        tags=data.get("tags") or [],
-        video_url=data.get("video_url", ""),
-        report_url=data.get("report_url", ""),
-        image_url=data.get("image_url", ""),
-        link_url=data.get("link_url", ""),
+      author_id=user_id,
+      major=user.major if user else "",
+      date=datetime.now().strftime("%Y-%m-%d"),
+      title=data.get("title"),
+      description=data.get("description", ""),
+      tags=data.get("tags") or [],
+      video_url=data.get("video_url", ""),
+      report_url=data.get("report_url", ""),
+      image_url="",
+      link_url=data.get("link_url", ""),
     )
+    image_urls = normalize_project_images(data)
+    sync_project_images(project, image_urls)
     db.add(project)
     db.commit()
     db.refresh(project)
-    logger.info(f"作品提交: user_id={user_id}, title={project.title}, id={project.id}")
+    logger.info("作品提交: user_id=%s, title=%s, id=%s", user_id, project.title, project.id)
+    return project
+
+
+def update_project(db: Session, project_id: int, user_id: str, data: dict):
+    project = get_project(db, project_id)
+    if not project:
+        return None
+    if project.author_id != user_id:
+        raise BusinessException(403, "只能修改自己的作品")
+    if project.status != "rejected":
+        raise BusinessException(400, "当前作品不可重新提交")
+
+    project.title = data.get("title", project.title)
+    project.description = data.get("description", "")
+    project.tags = data.get("tags") or []
+    project.video_url = data.get("video_url", "")
+    project.report_url = data.get("report_url", "")
+    project.link_url = data.get("link_url", "")
+    project.status = "pending"
+    project.reject_reason = ""
+    sync_project_images(project, normalize_project_images(data))
+
+    db.commit()
+    db.refresh(project)
+    logger.info("作品重新提交: user_id=%s, project_id=%s, title=%s", user_id, project.id, project.title)
     return project
 
 
@@ -57,22 +101,22 @@ def toggle_like(db: Session, user_id: str, project_id: int):
 
 
 def approve_project(db: Session, project_id: int):
-    p = get_project(db, project_id)
-    if not p:
+    project = get_project(db, project_id)
+    if not project:
         return None
-    p.status = "approved"
-    p.reject_reason = ""
+    project.status = "approved"
+    project.reject_reason = ""
     db.commit()
-    logger.info(f"作品审核通过: project_id={project_id}, title={p.title}")
-    return p
+    logger.info("作品审核通过: project_id=%s, title=%s", project_id, project.title)
+    return project
 
 
 def reject_project(db: Session, project_id: int, reason: str):
-    p = get_project(db, project_id)
-    if not p:
+    project = get_project(db, project_id)
+    if not project:
         return None
-    p.status = "rejected"
-    p.reject_reason = reason
+    project.status = "rejected"
+    project.reject_reason = reason
     db.commit()
-    logger.info(f"作品驳回: project_id={project_id}, title={p.title}, reason={reason}")
-    return p
+    logger.info("作品驳回: project_id=%s, title=%s, reason=%s", project_id, project.title, reason)
+    return project

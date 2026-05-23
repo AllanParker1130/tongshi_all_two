@@ -234,6 +234,15 @@ class ChapterQuizStatsOut(BaseModel):
     accuracy: int
 
 
+class ProjectImageOut(BaseModel):
+    id: Optional[int] = None
+    image_url: str = ""
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
 # ── Project ─────────────────────────────────────────────────────────────────
 class ProjectOut(BaseModel):
     id: int
@@ -248,6 +257,7 @@ class ProjectOut(BaseModel):
     video_url: str = ""
     report_url: str = ""
     image_url: str = ""
+    images: List[ProjectImageOut] = []
     link_url: str = ""
     status: str = "pending"
     reject_reason: str = ""
@@ -264,6 +274,18 @@ class ProjectCreate(BaseModel):
     video_url: str = ""
     report_url: str = ""
     image_url: str = ""
+    image_urls: List[str] = []
+    link_url: str = ""
+
+
+class ProjectUpdate(BaseModel):
+    title: str = Field(min_length=1)
+    description: str = ""
+    tags: List[str] = []
+    video_url: str = ""
+    report_url: str = ""
+    image_url: str = ""
+    image_urls: List[str] = []
     link_url: str = ""
 
 

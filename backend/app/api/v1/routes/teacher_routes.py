@@ -20,6 +20,35 @@ from app.models.entities import User, Project
 router = APIRouter(prefix="/teacher", tags=["teacher"])
 
 
+def _format_project(db: Session, p):
+    author = db.query(User).filter(User.id == p.author_id).first()
+    images = [
+        {"id": image.id, "image_url": image.image_url, "sort_order": image.sort_order}
+        for image in sorted(p.images, key=lambda item: (item.sort_order, item.id))
+    ]
+    if not images and p.image_url:
+        images = [{"image_url": p.image_url, "sort_order": 0}]
+    return {
+        "id": p.id,
+        "title": p.title,
+        "author_id": p.author_id,
+        "author_name": author.name if author else "",
+        "major": p.major,
+        "description": p.description,
+        "tags": p.tags,
+        "likes": p.likes,
+        "featured": p.featured,
+        "video_url": p.video_url,
+        "report_url": p.report_url,
+        "image_url": p.image_url,
+        "images": images,
+        "link_url": getattr(p, "link_url", ""),
+        "status": p.status,
+        "reject_reason": p.reject_reason,
+        "date": p.date,
+    }
+
+
 @router.get("/stats", summary="工作台概览", description="教师端：返回总学生数、已发布章节数、待审核作品数、练习题量等教学数据")
 def teacher_stats(db: Session = Depends(get_db), _: AuthUser = Depends(require_role("teacher"))):
     return success(get_teacher_stats(db))
@@ -41,19 +70,7 @@ def get_all_projects(
     _: AuthUser = Depends(require_role("teacher")),
 ):
     projects = list_all_projects(db, status)
-    result = []
-    for p in projects:
-        author = db.query(User).filter(User.id == p.author_id).first()
-        result.append({
-            "id": p.id, "title": p.title, "author_id": p.author_id,
-            "author_name": author.name if author else "",
-            "major": p.major, "description": p.description,
-            "tags": p.tags, "likes": p.likes, "featured": p.featured,
-            "video_url": p.video_url, "report_url": p.report_url,
-            "image_url": p.image_url, "link_url": getattr(p, "link_url", ""), "status": p.status,
-            "reject_reason": p.reject_reason, "date": p.date,
-        })
-    return success(result)
+    return success([_format_project(db, p) for p in projects])
 
 
 @router.post("/projects/{project_id}/approve", summary="通过作品审核", description="教师端：将指定作品设为审核通过")

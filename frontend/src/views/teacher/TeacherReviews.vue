@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { approveProject, downloadProjectReportsZip, getAllProjects, rejectProject } from '@/api/teacher'
@@ -10,6 +10,8 @@ const downloading = ref(false)
 const drawerVisible = ref(false)
 const selectedProject = ref<Project | null>(null)
 const rejectReason = ref('')
+const imagePreviewVisible = ref(false)
+const previewImage = ref('')
 
 const statusMap: Record<string, { label: string; type: 'warning' | 'success' | 'danger' }> = {
   pending: { label: '待审', type: 'warning' },
@@ -19,7 +21,19 @@ const statusMap: Record<string, { label: string; type: 'warning' | 'success' | '
 
 const pendingCount = computed(() => projects.value.filter(p => p.status === 'pending').length)
 const approvedCount = computed(() => projects.value.filter(p => p.status === 'approved').length)
-const rejectedCount = computed(() => projects.value.filter(p => p.status === 'rejected').length)
+const imageList = computed(() => {
+  if (!selectedProject.value) return []
+  if (selectedProject.value.images && selectedProject.value.images.length > 0) {
+    return selectedProject.value.images.map(item => item.image_url)
+  }
+  return selectedProject.value.image_url ? [selectedProject.value.image_url] : []
+})
+const materialsSummary = computed(() => ({
+  hasReport: Boolean(selectedProject.value?.report_url),
+  imageCount: imageList.value.length,
+  hasVideo: Boolean(selectedProject.value?.video_url),
+  hasLink: Boolean(selectedProject.value?.link_url),
+}))
 
 onMounted(async () => {
   try {
@@ -35,6 +49,11 @@ function openDetail(project: Project) {
   selectedProject.value = project
   rejectReason.value = ''
   drawerVisible.value = true
+}
+
+function openImagePreview(imageUrl: string) {
+  previewImage.value = imageUrl
+  imagePreviewVisible.value = true
 }
 
 async function handleApprove() {
@@ -71,8 +90,7 @@ async function handleReject() {
       { type: 'warning' },
     )
     await rejectProject(selectedProject.value.id, reason)
-    selectedProject.value.status = 'rejected'
-    selectedProject.value.reject_reason = reason
+    projects.value = projects.value.filter(item => item.id !== selectedProject.value?.id)
     drawerVisible.value = false
     ElMessage.success('已驳回')
   } catch (error) {
@@ -111,7 +129,6 @@ async function handleBatchDownload() {
     <div class="status-summary">
       <span class="summary-item">待审 <strong>{{ pendingCount }}</strong></span>
       <span class="summary-item">通过 <strong>{{ approvedCount }}</strong></span>
-      <span class="summary-item">驳回 <strong>{{ rejectedCount }}</strong></span>
     </div>
 
     <el-table :data="projects" stripe style="width: 100%" v-loading="loading">
@@ -119,6 +136,12 @@ async function handleBatchDownload() {
       <el-table-column prop="author_name" label="作者" width="120" />
       <el-table-column prop="major" label="专业" width="120" />
       <el-table-column prop="date" label="提交时间" width="120" />
+      <el-table-column label="材料" width="200">
+        <template #default="{ row }">
+          <span class="material-meta">PDF {{ row.report_url ? '已上传' : '未上传' }}</span>
+          <span class="material-meta">图片 {{ row.images?.length || (row.image_url ? 1 : 0) }} 张</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusMap[row.status]?.type || 'info'" size="small" effect="plain">
@@ -134,10 +157,10 @@ async function handleBatchDownload() {
     </el-table>
 
     <div v-if="!loading && projects.length === 0" class="empty-state">
-      <p>暂无待审核作品。学生提交后会出现在这里。</p>
+      <p>当前没有待审核或已通过的作品。</p>
     </div>
 
-    <el-drawer v-model="drawerVisible" title="作品详情" size="480px">
+    <el-drawer v-model="drawerVisible" title="作品详情" size="640px">
       <template v-if="selectedProject">
         <div class="detail-section">
           <h3>{{ selectedProject.title }}</h3>
@@ -154,6 +177,51 @@ async function handleBatchDownload() {
           <div class="detail-tags">
             <span v-for="tag in selectedProject.tags" :key="tag" class="tag">{{ tag }}</span>
           </div>
+        </div>
+
+        <div class="detail-section">
+          <label>材料完整性</label>
+          <div class="summary-grid">
+            <div class="summary-chip">PDF：{{ materialsSummary.hasReport ? '已上传' : '未上传' }}</div>
+            <div class="summary-chip">图片：{{ materialsSummary.imageCount }} 张</div>
+            <div class="summary-chip">视频：{{ materialsSummary.hasVideo ? '有' : '无' }}</div>
+            <div class="summary-chip">外链：{{ materialsSummary.hasLink ? '有' : '无' }}</div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <label>课程报告</label>
+          <div v-if="selectedProject.report_url" class="pdf-preview">
+            <div class="pdf-actions">
+              <a :href="selectedProject.report_url" target="_blank" rel="noopener" class="detail-link">
+                新开查看 PDF
+              </a>
+            </div>
+            <iframe :src="selectedProject.report_url" title="PDF 预览" class="pdf-frame"></iframe>
+          </div>
+          <p v-else class="empty-inline">学生未上传 PDF 报告。</p>
+        </div>
+
+        <div class="detail-section">
+          <label>作品图片</label>
+          <div v-if="imageList.length > 0" class="image-grid">
+            <button
+              v-for="(image, index) in imageList"
+              :key="`${image}-${index}`"
+              class="image-thumb"
+              @click="openImagePreview(image)"
+            >
+              <img :src="image" :alt="`作品图片 ${index + 1}`" />
+            </button>
+          </div>
+          <p v-else class="empty-inline">学生未上传作品图片。</p>
+        </div>
+
+        <div v-if="selectedProject.video_url" class="detail-section">
+          <label>演示视频</label>
+          <a :href="selectedProject.video_url" target="_blank" rel="noopener" class="detail-link">
+            {{ selectedProject.video_url }}
+          </a>
         </div>
 
         <div v-if="selectedProject.link_url" class="detail-section">
@@ -180,6 +248,10 @@ async function handleBatchDownload() {
         </div>
       </template>
     </el-drawer>
+
+    <el-dialog v-model="imagePreviewVisible" width="720px" append-to-body @close="previewImage = ''">
+      <img v-if="previewImage" :src="previewImage" alt="作品大图" class="preview-image" />
+    </el-dialog>
   </div>
 </template>
 
@@ -214,6 +286,12 @@ async function handleBatchDownload() {
   margin-left: var(--space-xs);
 }
 
+.material-meta {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
 .detail-section {
   margin-bottom: var(--space-xl);
 }
@@ -244,19 +322,65 @@ async function handleBatchDownload() {
   line-height: 1.7;
 }
 
-.detail-tags {
+.detail-tags,
+.summary-grid {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
 }
 
-.tag {
+.tag,
+.summary-chip {
   padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-create);
   background: var(--color-create-bg);
   border-radius: var(--radius-full);
+}
+
+.pdf-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.pdf-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pdf-frame {
+  width: 100%;
+  height: 320px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-alt);
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.image-thumb {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-bg-card);
+}
+
+.image-thumb img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.empty-inline {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
 }
 
 .reject-reason {
@@ -283,10 +407,23 @@ async function handleBatchDownload() {
   gap: var(--space-sm);
 }
 
+.preview-image {
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  display: block;
+}
+
 .empty-state {
   text-align: center;
   padding: var(--space-3xl) 0;
   color: var(--color-text-muted);
   font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .image-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

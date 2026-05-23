@@ -146,7 +146,24 @@ class Project(Base):
     date = Column(String(32), default="")
 
     author = relationship("User", back_populates="projects")
+    images = relationship(
+        "ProjectImage",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ProjectImage.sort_order",
+    )
     project_likes = relationship("ProjectLike", back_populates="project", cascade="all, delete-orphan")
+
+
+class ProjectImage(Base):
+    __tablename__ = "project_images"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_url = Column(String(512), nullable=False, default="")
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    project = relationship("Project", back_populates="images")
 
 
 class ProjectLike(Base):

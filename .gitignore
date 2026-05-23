@@ -15,7 +15,8 @@ __pycache__/
 *.mp3
 /tmp/
 temp/
-
+.superpowers
+scripts/
 # 4. IDE 与系统配置文件
 .vscode/
 .idea/

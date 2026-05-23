@@ -1,17 +1,32 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProject, toggleLike as apiToggleLike, type Project } from '@/api/project'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const project = ref<Project | null>(null)
 const loading = ref(true)
 const liked = ref(false)
 const relatedProjects = ref<{ id: number; title: string; author: string }[]>([])
+const previewImage = ref('')
+const imagePreviewVisible = ref(false)
 
 const projectId = computed(() => Number(route.params.id))
+const imageList = computed(() => {
+  if (!project.value) return []
+  if (project.value.images && project.value.images.length > 0) {
+    return project.value.images.map(item => item.image_url)
+  }
+  return project.value.image_url ? [project.value.image_url] : []
+})
+const canResubmit = computed(() => {
+  if (!project.value) return false
+  return project.value.status === 'rejected' && project.value.author_id === authStore.user?.id
+})
 
 onMounted(async () => {
   try {
@@ -29,6 +44,16 @@ async function toggleLike() {
     liked.value = true
   }
 }
+
+function goResubmit() {
+  if (!project.value) return
+  router.push(`/create/upload?projectId=${project.value.id}`)
+}
+
+function openPreview(image: string) {
+  previewImage.value = image
+  imagePreviewVisible.value = true
+}
 </script>
 
 <template>
@@ -36,24 +61,27 @@ async function toggleLike() {
     <div class="container">
       <button class="back-btn" @click="router.push('/create')">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M16 10H4m4-4l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16 10H4m4-4l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         返回作品列表
       </button>
 
       <div v-if="project" class="detail-content">
-        <!-- Image placeholder -->
         <div class="project-image">
-          <div class="image-placeholder">
+          <img v-if="imageList.length > 0" :src="imageList[0]" alt="作品图片" class="hero-image" />
+          <div v-else class="image-placeholder">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
               <path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            <span>作品图片</span>
+            <span>暂无作品图片</span>
           </div>
         </div>
 
-        <!-- Title & like -->
+        <div v-if="project.reject_reason" class="reject-alert">
+          <strong>驳回原因：</strong>{{ project.reject_reason }}
+        </div>
+
         <div class="project-header">
           <div>
             <h1>{{ project.title }}</h1>
@@ -62,19 +90,21 @@ async function toggleLike() {
           <button class="like-btn" :class="{ liked }" @click="toggleLike">
             <svg width="20" height="20" viewBox="0 0 24 24" :fill="liked ? 'currentColor' : 'none'">
               <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             {{ project.likes }}
           </button>
         </div>
 
-        <!-- Description -->
+        <div v-if="canResubmit" class="resubmit-bar">
+          <el-button type="warning" round @click="goResubmit">修改后重新提交</el-button>
+        </div>
+
         <section class="detail-section">
           <h3>作品介绍</h3>
           <p>{{ project.description }}</p>
         </section>
 
-        <!-- Tags -->
         <section class="detail-section">
           <h3>技术栈</h3>
           <div class="tags">
@@ -82,31 +112,41 @@ async function toggleLike() {
           </div>
         </section>
 
-        <!-- Video -->
+        <section v-if="imageList.length > 0" class="detail-section">
+          <h3>作品图片</h3>
+          <div class="gallery-grid">
+            <button
+              v-for="(image, index) in imageList"
+              :key="`${image}-${index}`"
+              class="gallery-item"
+              @click="openPreview(image)"
+            >
+              <img :src="image" :alt="`作品图片 ${index + 1}`" />
+            </button>
+          </div>
+        </section>
+
+        <section v-if="project.report_url" class="detail-section">
+          <h3>课程报告</h3>
+          <a :href="project.report_url" target="_blank" rel="noopener" class="video-link">
+            查看 PDF 报告
+          </a>
+        </section>
+
         <section v-if="project.video_url" class="detail-section">
           <h3>演示视频</h3>
           <a :href="project.video_url" target="_blank" rel="noopener" class="video-link">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
             观看演示视频
           </a>
         </section>
 
-        <!-- External link -->
         <section v-if="project.link_url" class="detail-section">
           <h3>项目链接</h3>
           <a :href="project.link_url" target="_blank" rel="noopener" class="external-link">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
             {{ project.link_url }}
           </a>
         </section>
 
-        <!-- Related projects -->
         <section v-if="relatedProjects.length > 0" class="detail-section">
           <h3>相关作品</h3>
           <div class="related-grid">
@@ -119,7 +159,7 @@ async function toggleLike() {
               <div class="related-image">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                   <path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
-                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </div>
               <div class="related-info">
@@ -137,6 +177,10 @@ async function toggleLike() {
         <button class="btn-back" @click="router.push('/create')">返回作品列表</button>
       </div>
     </div>
+
+    <el-dialog v-model="imagePreviewVisible" width="720px" append-to-body @close="previewImage = ''">
+      <img v-if="previewImage" :src="previewImage" alt="作品大图" class="preview-image" />
+    </el-dialog>
   </div>
 </template>
 
@@ -167,6 +211,13 @@ async function toggleLike() {
   margin-bottom: var(--space-xl);
 }
 
+.hero-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+
 .image-placeholder {
   aspect-ratio: 16 / 9;
   background: var(--color-bg-alt);
@@ -177,6 +228,17 @@ async function toggleLike() {
   gap: var(--space-sm);
   color: var(--color-text-muted);
   font-size: 0.9rem;
+}
+
+.reject-alert {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-sm);
+  color: #b91c1c;
+  font-size: 0.9rem;
+  line-height: 1.7;
 }
 
 .project-header {
@@ -223,15 +285,8 @@ async function toggleLike() {
   background: rgba(239, 68, 68, 0.08);
 }
 
-.like-btn.liked svg {
-  animation: heartBeat 0.4s var(--ease-spring);
-}
-
-@keyframes heartBeat {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.35); }
-  60% { transform: scale(0.9); }
-  100% { transform: scale(1); }
+.resubmit-bar {
+  margin-bottom: var(--space-xl);
 }
 
 .detail-section {
@@ -265,6 +320,26 @@ async function toggleLike() {
   background: var(--color-create-bg);
   border-radius: var(--radius-full);
   border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.gallery-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-card);
+}
+
+.gallery-item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
 }
 
 .video-link {
@@ -348,6 +423,13 @@ async function toggleLike() {
   color: var(--color-text-muted);
 }
 
+.preview-image {
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  display: block;
+}
+
 .not-found {
   text-align: center;
   padding: var(--space-4xl) 0;
@@ -375,7 +457,8 @@ async function toggleLike() {
 }
 
 @media (max-width: 768px) {
-  .related-grid {
+  .related-grid,
+  .gallery-grid {
     grid-template-columns: 1fr;
   }
 

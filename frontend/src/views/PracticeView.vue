@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getChapters, type Chapter } from '@/api/chapter'
+import { getQuestions } from '@/api/question'
 import { getQuizStats, getQuizHistory } from '@/api/quiz'
 
 const router = useRouter()
@@ -17,13 +18,18 @@ const stats = ref([
 
 const chapters = ref<Chapter[]>([])
 const recentExercises = ref<any[]>([])
+const questionTypeCounts = ref({
+  choice: 0,
+  fill: 0,
+})
 
 onMounted(async () => {
   try {
-    const [quizStats, chs, history] = await Promise.all([
+    const [quizStats, chs, history, questions] = await Promise.all([
       getQuizStats(),
       getChapters(),
       getQuizHistory(5),
+      getQuestions(),
     ])
     stats.value = [
       { label: '总题数', value: String(quizStats.total_questions), icon: '&#9632;' },
@@ -32,6 +38,10 @@ onMounted(async () => {
       { label: '今日练习', value: String(quizStats.today_count), icon: '&#9679;' },
     ]
     chapters.value = chs
+    questionTypeCounts.value = {
+      choice: questions.filter(item => item.type === 'choice').length,
+      fill: questions.filter(item => item.type === 'fill').length,
+    }
     recentExercises.value = history.map((h: any) => ({
       chapter: '',
       title: h.stem || '练习题目',
@@ -86,13 +96,13 @@ onMounted(async () => {
             <div class="type-icon choice-icon">A</div>
             <h3>选择题</h3>
             <p>四选一单选题，考查概念理解与知识记忆。提交即刻显示答案与解析。</p>
-            <div class="type-count">共 205 题</div>
+            <div class="type-count">共 {{ questionTypeCounts.choice }} 题</div>
           </div>
           <div class="type-card">
             <div class="type-icon fill-icon">—</div>
             <h3>填空题</h3>
             <p>关键词填空与简单计算，考查知识点掌握与计算能力。支持数值精确匹配。</p>
-            <div class="type-count">共 115 题</div>
+            <div class="type-count">共 {{ questionTypeCounts.fill }} 题</div>
           </div>
         </div>
       </div>
