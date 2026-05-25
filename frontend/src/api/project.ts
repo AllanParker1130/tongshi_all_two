@@ -4,6 +4,7 @@ export interface ProjectImage {
   id?: number
   image_url: string
   sort_order?: number
+  file_id?: number
 }
 
 export interface Project {
@@ -24,6 +25,8 @@ export interface Project {
   status: string
   reject_reason: string
   date: string
+  report_file_id?: number
+  cover_file_id?: number
 }
 
 export interface ProjectPayload {
@@ -35,6 +38,9 @@ export interface ProjectPayload {
   image_url?: string
   image_urls?: string[]
   link_url?: string
+  report_file_id?: number
+  cover_file_id?: number
+  image_file_ids?: number[]
 }
 
 export function getProjects() {

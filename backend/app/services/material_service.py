@@ -15,7 +15,7 @@ def list_all_materials(db: Session):
     return db.query(Material).join(Chapter).order_by(Material.chapter_id, Material.id).all()
 
 
-def create_material(db: Session, chapter_id: int, type_: str, title: str, url: str = "", size: str = "0 MB"):
+def create_material(db: Session, chapter_id: int, type_: str, title: str, url: str = "", size: str = "0 MB", file_id: int | None = None):
     ch = db.query(Chapter).filter(Chapter.id == chapter_id).first()
     if not ch:
         return None
@@ -26,6 +26,7 @@ def create_material(db: Session, chapter_id: int, type_: str, title: str, url: s
         url=url,
         size=size,
         date=datetime.now().strftime("%Y-%m-%d"),
+        file_id=file_id,
     )
     db.add(material)
     db.commit()

@@ -9,3 +9,5 @@ pymysql
 python-dotenv
 openpyxl
 alembic
+boto3
+python-magic

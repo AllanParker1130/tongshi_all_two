@@ -85,6 +85,7 @@ class Material(Base):
     pages = Column(Integer, default=0)
     size = Column(String(32), default="0 MB")
     date = Column(String(32), default="")
+    file_id = Column(Integer, ForeignKey("stored_files.id"), nullable=True, index=True)
 
     chapter = relationship("Chapter", back_populates="materials")
 
@@ -144,6 +145,8 @@ class Project(Base):
     status = Column(String(16), default="pending")
     reject_reason = Column(String(256), default="")
     date = Column(String(32), default="")
+    report_file_id = Column(Integer, ForeignKey("stored_files.id"), nullable=True, index=True)
+    cover_file_id = Column(Integer, ForeignKey("stored_files.id"), nullable=True, index=True)
 
     author = relationship("User", back_populates="projects")
     images = relationship(
@@ -162,6 +165,7 @@ class ProjectImage(Base):
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     image_url = Column(String(512), nullable=False, default="")
     sort_order = Column(Integer, nullable=False, default=0)
+    file_id = Column(Integer, ForeignKey("stored_files.id"), nullable=True, index=True)
 
     project = relationship("Project", back_populates="images")
 
@@ -227,3 +231,23 @@ class ActivityEvent(Base):
     date = Column(String(32), nullable=False)
     title = Column(String(128), nullable=False)
     description = Column(String(256), default="")
+
+
+class StoredFile(Base):
+    __tablename__ = "stored_files"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    biz_type = Column(String(32), nullable=False, default="")
+    biz_id = Column(Integer, nullable=True, index=True)
+    storage_provider = Column(String(16), nullable=False, default="local")
+    bucket_name = Column(String(128), default="")
+    object_key = Column(String(512), nullable=False, default="")
+    original_name = Column(String(255), nullable=False, default="")
+    stored_name = Column(String(255), nullable=False, default="")
+    content_type = Column(String(128), default="")
+    extension = Column(String(32), default="")
+    size_bytes = Column(Integer, nullable=False, default=0)
+    sha256 = Column(String(64), default="")
+    status = Column(String(16), nullable=False, default="active")
+    created_by = Column(String(32), ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

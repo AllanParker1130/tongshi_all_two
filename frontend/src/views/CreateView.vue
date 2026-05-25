@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProjects, type Project } from '@/api/project'
+import { resolveFileUrl } from '@/utils/url'
 
 const router = useRouter()
 const projects = ref<Project[]>([])
@@ -49,9 +50,15 @@ onMounted(async () => {
             class="project-card"
             :class="{ featured: project.featured }"
           >
-            <!-- Placeholder image -->
+            <!-- Project image -->
             <div class="project-image">
-              <div class="image-placeholder">
+              <img
+                v-if="project.images?.length || project.image_url"
+                :src="resolveFileUrl(project.images?.[0]?.image_url || project.image_url)"
+                :alt="project.title"
+                class="project-thumb"
+              />
+              <div v-else class="image-placeholder">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
                   <path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
                         stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -200,6 +207,13 @@ onMounted(async () => {
   position: relative;
   aspect-ratio: 16 / 10;
   background: var(--color-bg-alt);
+}
+
+.project-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .image-placeholder {

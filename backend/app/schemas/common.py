@@ -162,6 +162,7 @@ class MaterialOut(BaseModel):
     pages: int = 0
     size: str = ""
     date: str = ""
+    file_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -173,6 +174,7 @@ class MaterialCreate(BaseModel):
     title: str = Field(min_length=1)
     url: str = ""
     size: str = "0 MB"
+    file_id: Optional[int] = None
 
 
 # ── Question ────────────────────────────────────────────────────────────────
@@ -238,6 +240,7 @@ class ProjectImageOut(BaseModel):
     id: Optional[int] = None
     image_url: str = ""
     sort_order: int = 0
+    file_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -262,6 +265,8 @@ class ProjectOut(BaseModel):
     status: str = "pending"
     reject_reason: str = ""
     date: str = ""
+    report_file_id: Optional[int] = None
+    cover_file_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -276,6 +281,9 @@ class ProjectCreate(BaseModel):
     image_url: str = ""
     image_urls: List[str] = []
     link_url: str = ""
+    report_file_id: Optional[int] = None
+    cover_file_id: Optional[int] = None
+    image_file_ids: List[int] = []
 
 
 class ProjectUpdate(BaseModel):
@@ -287,6 +295,9 @@ class ProjectUpdate(BaseModel):
     image_url: str = ""
     image_urls: List[str] = []
     link_url: str = ""
+    report_file_id: Optional[int] = None
+    cover_file_id: Optional[int] = None
+    image_file_ids: List[int] = []
 
 
 class ProjectReviewAction(BaseModel):
@@ -330,6 +341,9 @@ class PortfolioOut(BaseModel):
 
 # ── Upload ──────────────────────────────────────────────────────────────────
 class UploadOut(BaseModel):
+    file_id: Optional[int] = None
     url: str
     filename: str
     size: int
+    content_type: str = ""
+    storage_provider: str = ""

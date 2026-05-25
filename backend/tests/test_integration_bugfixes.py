@@ -1,7 +1,8 @@
 """联调缺陷回归测试"""
+import io
 from pathlib import Path
 
-from app.models.entities import Project
+from app.models.entities import Project, StoredFile
 from tests.conftest import auth_header
 
 
@@ -417,3 +418,187 @@ class TestIntegrationBugfixes:
             StudentClassEnrollment.user_id == student.id,
             StudentClassEnrollment.class_id == keep_class_id,
         ).first() is not None
+
+    def test_get_file_by_file_id_returns_streamed_content(self, client, db_session, teacher_token):
+        """通过 /api/files/{file_id} 应返回文件内容"""
+        upload_dir = Path(__file__).resolve().parents[1] / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        test_file = upload_dir / "file-by-id-test.pdf"
+        test_file.write_bytes(b"%PDF-1.4 test content")
+
+        try:
+            stored = StoredFile(
+                biz_type="material",
+                storage_provider="local",
+                object_key="file-by-id-test.pdf",
+                original_name="test.pdf",
+                stored_name="file-by-id-test.pdf",
+                content_type="application/pdf",
+                extension=".pdf",
+                size_bytes=21,
+                created_by="T001",
+            )
+            db_session.add(stored)
+            db_session.commit()
+            file_id = stored.id
+
+            resp = client.get(f"/api/files/{file_id}", headers=auth_header(teacher_token))
+            assert resp.status_code == 200
+            assert resp.content.startswith(b"%PDF")
+        finally:
+            try:
+                if test_file.exists():
+                    test_file.unlink()
+            except PermissionError:
+                pass
+
+    def test_upload_returns_file_id_and_api_file_url(self, client, teacher_token):
+        """上传接口应返回 file_id 和 /api/files/ 前缀的 URL"""
+        pdf_content = b"%PDF-1.4 fake pdf content"
+        resp = client.post(
+            "/api/upload",
+            files={"file": ("test-upload.pdf", io.BytesIO(pdf_content), "application/pdf")},
+            headers=auth_header(teacher_token),
+        )
+        data = resp.json()
+
+        assert data["code"] == 0
+        assert data["data"]["file_id"] is not None
+        assert data["data"]["file_id"] > 0
+        assert data["data"]["url"].startswith("/api/files/")
+        assert data["data"]["content_type"] == "application/pdf"
+        assert data["data"]["storage_provider"] in {"local", "s3"}
+
+    def test_upload_rejects_wrong_magic_number_even_if_extension_matches(self, client, teacher_token):
+        """魔数不匹配的文件应被拒绝，即使扩展名正确"""
+        # 伪造 PDF 扩展名但内容不是 PDF
+        fake_content = b"This is not a real PDF file"
+        resp = client.post(
+            "/api/upload",
+            files={"file": ("fake.pdf", io.BytesIO(fake_content), "application/pdf")},
+            headers=auth_header(teacher_token),
+        )
+        data = resp.json()
+
+        assert data["code"] == 400
+
+    def test_create_material_persists_file_id(self, client, db_session, teacher_token):
+        """创建资料时应持久化 file_id"""
+        stored = StoredFile(
+            biz_type="upload",
+            storage_provider="local",
+            object_key="test-file-id-material.pdf",
+            original_name="讲义.pdf",
+            stored_name="test-file-id-material.pdf",
+            content_type="application/pdf",
+            extension=".pdf",
+            size_bytes=100,
+            created_by="T001",
+        )
+        db_session.add(stored)
+        db_session.commit()
+        file_id = stored.id
+
+        create_resp = client.post(
+            "/api/materials",
+            json={
+                "chapter_id": 1,
+                "type": "pdf",
+                "title": "file_id 测试资料",
+                "url": f"/api/files/{file_id}",
+                "size": "0.1 MB",
+                "file_id": file_id,
+            },
+            headers=auth_header(teacher_token),
+        )
+        assert create_resp.json()["code"] == 0
+
+        list_resp = client.get("/api/materials", headers=auth_header(teacher_token))
+        materials = list_resp.json()["data"]
+        created = next(item for item in materials if item["id"] == create_resp.json()["data"]["id"])
+        assert created["file_id"] == file_id
+        assert created["url"].startswith("/api/files/")
+
+    def test_create_project_persists_report_file_id(self, client, db_session, student_token):
+        """创建作品时应持久化 report_file_id"""
+        stored = StoredFile(
+            biz_type="project_report",
+            storage_provider="local",
+            object_key="test-report.pdf",
+            original_name="报告.pdf",
+            stored_name="test-report.pdf",
+            content_type="application/pdf",
+            extension=".pdf",
+            size_bytes=200,
+            created_by="2025001",
+        )
+        db_session.add(stored)
+        db_session.commit()
+        file_id = stored.id
+
+        resp = client.post(
+            "/api/projects",
+            json={
+                "title": "file_id 作品测试",
+                "description": "测试描述",
+                "tags": ["AI"],
+                "report_url": f"/api/files/{file_id}",
+                "report_file_id": file_id,
+            },
+            headers=auth_header(student_token),
+        )
+        assert resp.json()["code"] == 0
+        project_id = resp.json()["data"]["id"]
+
+        detail = client.get(f"/api/projects/{project_id}", headers=auth_header(student_token))
+        data = detail.json()["data"]
+        assert data["report_file_id"] == file_id
+
+    def test_batch_download_returns_zip_for_approved_projects(self, client, db_session, teacher_token):
+        """批量下载应返回 ZIP 格式"""
+        upload_dir = Path(__file__).resolve().parents[1] / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        report_path = upload_dir / "batch-test-report.pdf"
+        report_path.write_bytes(b"%PDF-1.4 batch test")
+
+        try:
+            db_session.add(Project(
+                title="批量下载测试作品",
+                author_id="2025001",
+                major="自动化专业",
+                description="测试",
+                tags=[],
+                report_url="/uploads/batch-test-report.pdf",
+                status="approved",
+                date="2026-05-25",
+            ))
+            db_session.commit()
+
+            resp = client.get(
+                "/api/teacher/projects/batch-download",
+                headers=auth_header(teacher_token),
+            )
+            assert resp.status_code == 200
+            assert resp.headers["content-type"].startswith("application/zip")
+            assert resp.content.startswith(b"PK")
+        finally:
+            try:
+                if report_path.exists():
+                    report_path.unlink()
+            except PermissionError:
+                pass
+
+    def test_get_file_by_legacy_upload_url_still_works(self, client, teacher_token):
+        """历史 /uploads/... 路径仍可正常访问"""
+        upload_dir = Path(__file__).resolve().parents[1] / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        legacy_file = upload_dir / "legacy-test.txt"
+        legacy_file.write_text("legacy content")
+
+        try:
+            resp = client.get("/uploads/legacy-test.txt")
+            assert resp.status_code == 200
+            assert resp.text == "legacy content"
+        finally:
+            if legacy_file.exists():
+                legacy_file.unlink()

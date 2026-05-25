@@ -18,10 +18,11 @@ def normalize_project_images(data: dict) -> list[str]:
     return image_urls[:3]
 
 
-def sync_project_images(project: Project, image_urls: list[str]) -> None:
+def sync_project_images(project: Project, image_urls: list[str], image_file_ids: list[int] | None = None) -> None:
     project.images.clear()
     for index, image_url in enumerate(image_urls):
-        project.images.append(ProjectImage(image_url=image_url, sort_order=index))
+        file_id = image_file_ids[index] if image_file_ids and index < len(image_file_ids) else None
+        project.images.append(ProjectImage(image_url=image_url, sort_order=index, file_id=file_id))
     project.image_url = image_urls[0] if image_urls else ""
 
 
@@ -50,9 +51,12 @@ def create_project(db: Session, user_id: str, data: dict):
       report_url=data.get("report_url", ""),
       image_url="",
       link_url=data.get("link_url", ""),
+      report_file_id=data.get("report_file_id"),
+      cover_file_id=data.get("cover_file_id"),
     )
     image_urls = normalize_project_images(data)
-    sync_project_images(project, image_urls)
+    image_file_ids = data.get("image_file_ids") or []
+    sync_project_images(project, image_urls, image_file_ids)
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -77,7 +81,12 @@ def update_project(db: Session, project_id: int, user_id: str, data: dict):
     project.link_url = data.get("link_url", "")
     project.status = "pending"
     project.reject_reason = ""
-    sync_project_images(project, normalize_project_images(data))
+    if data.get("report_file_id") is not None:
+        project.report_file_id = data["report_file_id"]
+    if data.get("cover_file_id") is not None:
+        project.cover_file_id = data["cover_file_id"]
+    image_file_ids = data.get("image_file_ids") or []
+    sync_project_images(project, normalize_project_images(data), image_file_ids)
 
     db.commit()
     db.refresh(project)

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { approveProject, downloadProjectReportsZip, getAllProjects, rejectProject } from '@/api/teacher'
 import type { Project } from '@/api/project'
+import { resolveFileUrl } from '@/utils/url'
 
 const projects = ref<Project[]>([])
 const loading = ref(true)
@@ -24,9 +25,9 @@ const approvedCount = computed(() => projects.value.filter(p => p.status === 'ap
 const imageList = computed(() => {
   if (!selectedProject.value) return []
   if (selectedProject.value.images && selectedProject.value.images.length > 0) {
-    return selectedProject.value.images.map(item => item.image_url)
+    return selectedProject.value.images.map(item => resolveFileUrl(item.image_url))
   }
-  return selectedProject.value.image_url ? [selectedProject.value.image_url] : []
+  return selectedProject.value.image_url ? [resolveFileUrl(selectedProject.value.image_url)] : []
 })
 const materialsSummary = computed(() => ({
   hasReport: Boolean(selectedProject.value?.report_url),
@@ -193,11 +194,11 @@ async function handleBatchDownload() {
           <label>课程报告</label>
           <div v-if="selectedProject.report_url" class="pdf-preview">
             <div class="pdf-actions">
-              <a :href="selectedProject.report_url" target="_blank" rel="noopener" class="detail-link">
+              <a :href="resolveFileUrl(selectedProject.report_url)" target="_blank" rel="noopener" class="detail-link">
                 新开查看 PDF
               </a>
             </div>
-            <iframe :src="selectedProject.report_url" title="PDF 预览" class="pdf-frame"></iframe>
+            <iframe :src="resolveFileUrl(selectedProject.report_url)" title="PDF 预览" class="pdf-frame"></iframe>
           </div>
           <p v-else class="empty-inline">学生未上传 PDF 报告。</p>
         </div>
@@ -219,7 +220,7 @@ async function handleBatchDownload() {
 
         <div v-if="selectedProject.video_url" class="detail-section">
           <label>演示视频</label>
-          <a :href="selectedProject.video_url" target="_blank" rel="noopener" class="detail-link">
+          <a :href="resolveFileUrl(selectedProject.video_url)" target="_blank" rel="noopener" class="detail-link">
             {{ selectedProject.video_url }}
           </a>
         </div>

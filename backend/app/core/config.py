@@ -32,6 +32,16 @@ class Settings:
     access_token_expire_minutes: int = _env_int("ACCESS_TOKEN_EXPIRE_MINUTES", default=10080)
     allowed_origins: str = _env("ALLOWED_ORIGINS", default="*")
     database_url: str = _env("DATABASE_URL", default="mysql+pymysql://root:123456@127.0.0.1:3306/tongshi?charset=utf8mb4")
+    # 文件存储配置
+    storage_backend: str = _env("STORAGE_BACKEND", default="local").lower()
+    local_upload_dir: str = _env("LOCAL_UPLOAD_DIR", default=str(BACKEND_ROOT / "uploads"))
+    s3_endpoint: str = _env("S3_ENDPOINT", default="")
+    s3_access_key: str = _env("S3_ACCESS_KEY", default="")
+    s3_secret_key: str = _env("S3_SECRET_KEY", default="")
+    s3_bucket_public: str = _env("S3_BUCKET_PUBLIC", default="tongshi-public")
+    s3_bucket_private: str = _env("S3_BUCKET_PRIVATE", default="tongshi-private")
+    s3_region: str = _env("S3_REGION", default="us-east-1")
+    s3_force_path_style: bool = _env("S3_FORCE_PATH_STYLE", default="true").lower() == "true"
 
 
 settings = Settings()

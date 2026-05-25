@@ -29,6 +29,11 @@ scripts/
 *.db-shm
 *.db-wal
 *.db-journal
+*.sqlite
+*.sqlite3
+backend/tmp/
+backend/exports/
+*.zip.tmp
 
 # 6. Claude 本机配置
 .claude/settings.local.json

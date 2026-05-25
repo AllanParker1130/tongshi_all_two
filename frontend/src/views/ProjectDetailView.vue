@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProject, toggleLike as apiToggleLike, type Project } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
+import { resolveFileUrl } from '@/utils/url'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,9 +20,9 @@ const projectId = computed(() => Number(route.params.id))
 const imageList = computed(() => {
   if (!project.value) return []
   if (project.value.images && project.value.images.length > 0) {
-    return project.value.images.map(item => item.image_url)
+    return project.value.images.map(item => resolveFileUrl(item.image_url))
   }
-  return project.value.image_url ? [project.value.image_url] : []
+  return project.value.image_url ? [resolveFileUrl(project.value.image_url)] : []
 })
 const canResubmit = computed(() => {
   if (!project.value) return false
@@ -128,21 +129,21 @@ function openPreview(image: string) {
 
         <section v-if="project.report_url" class="detail-section">
           <h3>课程报告</h3>
-          <a :href="project.report_url" target="_blank" rel="noopener" class="video-link">
+          <a :href="resolveFileUrl(project.report_url)" target="_blank" rel="noopener" class="video-link">
             查看 PDF 报告
           </a>
         </section>
 
         <section v-if="project.video_url" class="detail-section">
           <h3>演示视频</h3>
-          <a :href="project.video_url" target="_blank" rel="noopener" class="video-link">
+          <a :href="resolveFileUrl(project.video_url)" target="_blank" rel="noopener" class="video-link">
             观看演示视频
           </a>
         </section>
 
         <section v-if="project.link_url" class="detail-section">
           <h3>项目链接</h3>
-          <a :href="project.link_url" target="_blank" rel="noopener" class="external-link">
+          <a :href="resolveFileUrl(project.link_url)" target="_blank" rel="noopener" class="external-link">
             {{ project.link_url }}
           </a>
         </section>

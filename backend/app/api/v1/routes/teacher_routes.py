@@ -23,7 +23,7 @@ router = APIRouter(prefix="/teacher", tags=["teacher"])
 def _format_project(db: Session, p):
     author = db.query(User).filter(User.id == p.author_id).first()
     images = [
-        {"id": image.id, "image_url": image.image_url, "sort_order": image.sort_order}
+        {"id": image.id, "image_url": image.image_url, "sort_order": image.sort_order, "file_id": image.file_id}
         for image in sorted(p.images, key=lambda item: (item.sort_order, item.id))
     ]
     if not images and p.image_url:
@@ -46,6 +46,8 @@ def _format_project(db: Session, p):
         "status": p.status,
         "reject_reason": p.reject_reason,
         "date": p.date,
+        "report_file_id": getattr(p, "report_file_id", None),
+        "cover_file_id": getattr(p, "cover_file_id", None),
     }
 
 
@@ -107,7 +109,7 @@ def batch_download_projects(
     if not projects:
         raise BusinessException(404, "没有可下载的作品报告")
 
-    upload_dir = Path(__file__).resolve().parents[3] / "uploads"
+    upload_dir = Path(__file__).resolve().parents[4] / "uploads"
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:

@@ -19,6 +19,7 @@ def _format_material(m):
         "type": m.type, "title": m.title, "url": m.url,
         "duration": m.duration, "pages": m.pages,
         "size": m.size, "date": m.date,
+        "file_id": m.file_id,
     }
 
 
@@ -47,7 +48,7 @@ def add_material(
     db: Session = Depends(get_db),
     _: AuthUser = Depends(require_role("teacher")),
 ):
-    m = create_material(db, data.chapter_id, data.type, data.title, data.url, data.size)
+    m = create_material(db, data.chapter_id, data.type, data.title, data.url, data.size, data.file_id)
     if not m:
         raise BusinessException(404, "章节不存在")
     return success({"id": m.id})

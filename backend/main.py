@@ -1,9 +1,15 @@
 """AI 通识课平台 — 后端服务
 Layered architecture: routes → services → models (MySQL + SQLAlchemy)
+支持多 worker 部署：seed 逻辑通过文件锁互斥，避免重复执行。
 """
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+if sys.platform != "win32":
+    import fcntl
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +32,45 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# ── seed 互斥锁 ──────────────────────────────────────────────────────────────
+_SEED_LOCK_FILE = Path(__file__).resolve().parent / ".seed_lock"
+
+
+def _seed_if_empty():
+    """带文件锁的种子数据初始化，多 worker 下仅第一个 worker 执行。Windows 下无 fcntl，跳过锁。"""
+    lock_fd = None
+    locked = False
+    if sys.platform != "win32":
+        try:
+            lock_fd = open(_SEED_LOCK_FILE, "w")
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except (IOError, OSError):
+            logger.info("Seed lock held by another worker, skipping.")
+            return
+
+    try:
+        from seed_data import seed
+        from app.db.session import SessionLocal
+        from app.models.entities import Chapter
+        db = SessionLocal()
+        try:
+            count = db.query(Chapter).count()
+            if count == 0:
+                logger.info("Empty database, running seed...")
+                seed()
+            else:
+                logger.info("Database already seeded, skipping.")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Seed error: {e}")
+    finally:
+        if locked and lock_fd:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            lock_fd.close()
+
+
 # ── lifespan ─────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,18 +78,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_schema_compatibility(engine)
     logger.info(f"Database tables ready ({settings.database_url.split(':')[0]})")
-    try:
-        from seed_data import seed
-        from app.db.session import SessionLocal
-        from app.models.entities import Chapter
-        db = SessionLocal()
-        count = db.query(Chapter).count()
-        if count == 0:
-            logger.info("Empty database, running seed...")
-            seed()
-        db.close()
-    except Exception as e:
-        logger.warning(f"Seed skipped: {e}")
+    _seed_if_empty()
 
     yield  # 服务器运行中...
 

@@ -11,6 +11,7 @@ export interface Material {
   pages: number
   size: string
   date: string
+  file_id?: number
 }
 
 export interface MaterialCreatePayload {
@@ -19,6 +20,7 @@ export interface MaterialCreatePayload {
   title: string
   url: string
   size: string
+  file_id?: number
 }
 
 export function getAllMaterials() {
