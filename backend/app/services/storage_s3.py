@@ -1,8 +1,8 @@
 """SeaweedFS / S3 兼容存储适配器"""
-import io
 from typing import BinaryIO
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.core.config import settings
@@ -13,12 +13,18 @@ class S3StorageAdapter:
     """基于 boto3 的 S3 存储适配器"""
 
     def __init__(self):
+        client_config = None
+        if settings.s3_force_path_style:
+            # SeaweedFS 本地网关默认更适合 path-style 访问格式。
+            client_config = Config(s3={"addressing_style": "path"})
+
         self._client = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint,
             aws_access_key_id=settings.s3_access_key,
             aws_secret_access_key=settings.s3_secret_key,
             region_name=settings.s3_region,
+            config=client_config,
         )
         self._bucket_public = settings.s3_bucket_public
         self._bucket_private = settings.s3_bucket_private
@@ -26,8 +32,14 @@ class S3StorageAdapter:
     def _resolve_bucket(self, bucket_name: str = "") -> str:
         return bucket_name or self._bucket_public
 
-    def save_bytes(self, *, content: bytes, object_key: str, content_type: str = "",
-                   bucket_name: str = "") -> StoredObject:
+    def save_bytes(
+        self,
+        *,
+        content: bytes,
+        object_key: str,
+        content_type: str = "",
+        bucket_name: str = "",
+    ) -> StoredObject:
         bucket = self._resolve_bucket(bucket_name)
         extra_args = {}
         if content_type:

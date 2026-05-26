@@ -105,6 +105,31 @@ py main.py
 - API 文档：http://127.0.0.1:8050/docs
 - 健康检查：http://127.0.0.1:8050/health
 
+### Windows 一键启动
+
+本地 Windows 开发可直接使用：
+
+```bash
+cd backend
+start_backend.bat
+```
+
+或只做启动前检查：
+
+```bash
+cd backend
+powershell -ExecutionPolicy Bypass -File .\start_backend.ps1 -CheckOnly
+```
+
+脚本会自动完成以下动作：
+- 检查 Python 命令是否可用
+- 检查后端依赖是否已安装
+- 检查 `.env` 是否存在
+- 检查 MySQL 是否可连接；失败时尝试执行 `database_setup.py`
+- 当 `STORAGE_BACKEND=s3` 时检查 SeaweedFS S3 网关是否可达；若不可达，会尝试用固定路径的 `weed.exe mini` 自动拉起
+- 检查 `8050` 端口是否已有可用后端实例
+- 条件满足后启动 `main.py`
+
 ---
 
 ## 核心设计
@@ -223,6 +248,8 @@ S3_BUCKET_PRIVATE=tongshi-private
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true
 ```
+
+本地接入 SeaweedFS 时，`S3_BUCKET_PUBLIC` 和 `S3_BUCKET_PRIVATE` 需要提前在 S3 网关中手动创建；当前项目不会在启动时自动建桶。
 
 **统一文件访问路由：** `GET /api/files/{file_id}`，自动根据 `StoredFile` 记录分发到本地或 S3 存储。
 

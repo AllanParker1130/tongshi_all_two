@@ -9,16 +9,36 @@
 | `/learn` | `src/views/LearnView.vue` | 学生端课程列表 |
 | `/learn/course/:courseId` | `src/views/CourseDetailView.vue` | 学生端课程详情页 |
 | `/learn/:chapterId` | `src/views/ChapterView.vue` | 章节学习页，展示视频和 PDF |
+| `/practice` | `src/views/PracticeView.vue` | 学生端在线测验 |
+| `/create` | `src/views/CreateView.vue` | 学生端作品广场 |
+| `/create/upload` | `src/views/ProjectUploadView.vue` | 学生端提交/编辑作品 |
+| `/create/project/:id` | `src/views/ProjectDetailView.vue` | 作品详情页 |
+| `/act` | `src/views/ActView.vue` | 课程活动时间线 |
+| `/portfolio` | `src/views/PortfolioView.vue` | 成长档案（雷达图） |
+| `/teacher/dashboard` | `src/views/teacher/TeacherDashboard.vue` | 教师端工作台概览 |
 | `/teacher/materials` | `src/views/teacher/TeacherMaterials.vue` | 教师端资料、课程、章节和排课管理 |
+| `/teacher/questions` | `src/views/teacher/TeacherQuestions.vue` | 教师端题库管理 |
+| `/teacher/students` | `src/views/teacher/TeacherStudents.vue` | 教师端学生数据 |
+| `/teacher/classes` | `src/views/teacher/TeacherClasses.vue` | 教师端班级管理 |
+| `/teacher/announcements` | `src/views/teacher/TeacherAnnouncements.vue` | 教师端公告/任务管理 |
+| `/teacher/reviews` | `src/views/teacher/TeacherReviews.vue` | 教师端作品审核 |
 
 ## API 封装
 
 | 文件 | 说明 |
 |------|------|
+| `src/api/auth.ts` | 登录、注册、获取当前用户、修改密码、忘记密码 |
 | `src/api/course.ts` | 课程列表、课程详情、课程增删改 |
 | `src/api/chapter.ts` | 章节列表、章节增删改、章节排课 |
-| `src/api/material.ts` | 学习资料列表、上传后登记、删除 |
-| `src/api/upload.ts` | 通用文件上传 |
+| `src/api/material.ts` | 学习资料列表、上传后登记、删除（含 file_id） |
+| `src/api/question.ts` | 题库 CRUD + Excel 导入 |
+| `src/api/quiz.ts` | 答题提交、历史、统计 |
+| `src/api/project.ts` | 作品广场、提交、点赞、我的作品（含 file_id 字段） |
+| `src/api/upload.ts` | 通用文件上传（返回 file_id + content_type + storage_provider） |
+| `src/api/teacher.ts` | 教师工作台、学生数据、作品审核、批量下载 |
+| `src/api/class.ts` | 班级管理 + Excel 批量导入学生 |
+| `src/api/announcement.ts` | 公告/任务 CRUD + 已读/完成追踪 |
+| `src/api/portfolio.ts` | 成长档案数据 |
 
 课程体系的前端关系：
 

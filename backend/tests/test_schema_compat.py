@@ -1,10 +1,12 @@
 """数据库结构兼容修复测试"""
 import os
 
+from botocore.config import Config
 from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import Settings
 from app.db.schema_compat import ensure_schema_compatibility
+from app.services.storage_s3 import S3StorageAdapter
 
 
 def test_ensure_schema_compatibility_adds_chapter_schedule_columns():
@@ -50,9 +52,66 @@ def test_settings_defaults_keep_mysql_and_local_storage(monkeypatch):
     """未设置 S3 环境变量时，storage_backend 默认 local，DATABASE_URL 不受影响"""
     monkeypatch.delenv("STORAGE_BACKEND", raising=False)
     monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://root:123456@127.0.0.1:3306/tongshi?charset=utf8mb4")
+
     settings = Settings()
+
     assert settings.database_url.startswith("mysql+pymysql://")
     assert settings.storage_backend in {"local", "s3"}
+
+
+def test_settings_reads_seaweedfs_s3_config(monkeypatch):
+    """应正确读取本地 SeaweedFS S3 配置"""
+    monkeypatch.setenv("STORAGE_BACKEND", "s3")
+    monkeypatch.setenv("S3_ENDPOINT", "http://localhost:8333")
+    monkeypatch.setenv("S3_ACCESS_KEY", "test")
+    monkeypatch.setenv("S3_SECRET_KEY", "test")
+    monkeypatch.setenv("S3_BUCKET_PUBLIC", "tongshi-public")
+    monkeypatch.setenv("S3_BUCKET_PRIVATE", "tongshi-private")
+    monkeypatch.setenv("S3_REGION", "us-east-1")
+    monkeypatch.setenv("S3_FORCE_PATH_STYLE", "true")
+
+    settings = Settings()
+
+    assert settings.storage_backend == "s3"
+    assert settings.s3_endpoint == "http://localhost:8333"
+    assert settings.s3_access_key == "test"
+    assert settings.s3_secret_key == "test"
+    assert settings.s3_bucket_public == "tongshi-public"
+    assert settings.s3_bucket_private == "tongshi-private"
+    assert settings.s3_region == "us-east-1"
+    assert settings.s3_force_path_style is True
+
+
+def test_s3_storage_adapter_uses_path_style_for_seaweedfs(monkeypatch):
+    """SeaweedFS S3 网关应使用 path-style addressing"""
+    monkeypatch.setattr("app.services.storage_s3.settings.s3_endpoint", "http://localhost:8333")
+    monkeypatch.setattr("app.services.storage_s3.settings.s3_access_key", "test")
+    monkeypatch.setattr("app.services.storage_s3.settings.s3_secret_key", "test")
+    monkeypatch.setattr("app.services.storage_s3.settings.s3_region", "us-east-1")
+    monkeypatch.setattr("app.services.storage_s3.settings.s3_force_path_style", True)
+
+    captured: dict[str, object] = {}
+
+    class DummyClient:
+        pass
+
+    def fake_boto3_client(service_name: str, **kwargs):
+        captured["service_name"] = service_name
+        captured.update(kwargs)
+        return DummyClient()
+
+    monkeypatch.setattr("app.services.storage_s3.boto3.client", fake_boto3_client)
+
+    adapter = S3StorageAdapter()
+
+    assert isinstance(adapter._client, DummyClient)
+    assert captured["service_name"] == "s3"
+    assert captured["endpoint_url"] == "http://localhost:8333"
+    assert captured["aws_access_key_id"] == "test"
+    assert captured["aws_secret_access_key"] == "test"
+    assert captured["region_name"] == "us-east-1"
+    assert isinstance(captured["config"], Config)
+    assert captured["config"].s3 == {"addressing_style": "path"}
 
 
 def test_ensure_schema_compatibility_creates_stored_files_table():
