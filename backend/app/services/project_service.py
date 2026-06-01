@@ -183,10 +183,11 @@ def delete_project(db: Session, project_id: int):
     return project
 
 
-def format_project(db: Session, p) -> dict:
+def format_project(db: Session, p, user_id: str | None = None) -> dict:
     """将 Project ORM 对象格式化为 API 响应 dict（唯一规范版本）。
 
     所有路由统一调用此函数，避免 _format_project 重复定义。
+    传入 user_id 时返回 is_liked 字段。
     """
     author = db.query(User).filter(User.id == p.author_id).first()
     images = [
@@ -196,6 +197,15 @@ def format_project(db: Session, p) -> dict:
     ] if hasattr(p, "images") and p.images else []
     if not images and p.image_url:
         images = [{"image_url": p.image_url, "sort_order": 0}]
+
+    # 查询当前用户是否已点赞
+    is_liked = False
+    if user_id:
+        is_liked = db.query(ProjectLike).filter(
+            ProjectLike.user_id == user_id,
+            ProjectLike.project_id == p.id
+        ).first() is not None
+
     return {
         "id": p.id,
         "title": p.title,
@@ -205,6 +215,7 @@ def format_project(db: Session, p) -> dict:
         "description": p.description,
         "tags": p.tags if hasattr(p, "tags") else [],
         "likes": p.likes,
+        "is_liked": is_liked,
         "featured": p.featured if hasattr(p, "featured") else False,
         "video_url": p.video_url if hasattr(p, "video_url") else "",
         "report_url": p.report_url if hasattr(p, "report_url") else "",
@@ -226,4 +237,4 @@ def list_liked_projects(db: Session, user_id: str) -> list:
     if not project_ids:
         return []
     projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
-    return [format_project(db, proj) for proj in projects]
+    return [format_project(db, proj, user_id) for proj in projects]

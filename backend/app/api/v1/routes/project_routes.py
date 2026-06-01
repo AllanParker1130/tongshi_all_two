@@ -20,10 +20,10 @@ def get_projects(
     page: int = 1,
     page_size: int = 12,
     db: Session = Depends(get_db),
-    _: AuthUser = Depends(get_current_user),
+    current_user: AuthUser = Depends(get_current_user),
 ):
     projects, total = list_approved_projects(db, page, page_size)
-    return paginated_success([format_project(db, p) for p in projects], total, page, page_size)
+    return paginated_success([format_project(db, p, current_user.id) for p in projects], total, page, page_size)
 
 
 @router.get("/mine", summary="我的作品", description="学生端：查看自己提交的所有作品")
@@ -34,15 +34,15 @@ def get_my_projects(
     current_user: AuthUser = Depends(get_current_user),
 ):
     projects, total = get_user_projects(db, current_user.id, page, page_size)
-    return paginated_success([format_project(db, p) for p in projects], total, page, page_size)
+    return paginated_success([format_project(db, p, current_user.id) for p in projects], total, page, page_size)
 
 
 @router.get("/{project_id}", summary="作品详情", description="查看指定作品的完整信息")
-def get_project_detail(project_id: int, db: Session = Depends(get_db), _: AuthUser = Depends(get_current_user)):
+def get_project_detail(project_id: int, db: Session = Depends(get_db), current_user: AuthUser = Depends(get_current_user)):
     p = get_project(db, project_id)
     if not p:
         raise BusinessException(404, "作品不存在")
-    return success(format_project(db, p))
+    return success(format_project(db, p, current_user.id))
 
 
 @router.post("", summary="提交作品", description="学生端：提交新的 AI 项目作品")

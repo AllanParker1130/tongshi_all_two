@@ -32,18 +32,18 @@ const canResubmit = computed(() => {
 onMounted(async () => {
   try {
     project.value = await getProject(projectId.value)
+    // 从后端返回的 is_liked 字段初始化点赞状态
+    liked.value = project.value?.is_liked ?? false
   } finally {
     loading.value = false
   }
 })
 
 async function toggleLike() {
-  if (!project.value || liked.value) return
+  if (!project.value) return
   const result = await apiToggleLike(project.value.id)
-  if (result.liked && project.value) {
-    project.value.likes = result.likes
-    liked.value = true
-  }
+  project.value.likes = result.likes
+  liked.value = result.liked
 }
 
 function goResubmit() {

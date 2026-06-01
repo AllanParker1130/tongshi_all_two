@@ -16,6 +16,7 @@ export interface Project {
   description: string
   tags: string[]
   likes: number
+  is_liked: boolean
   featured: boolean
   video_url: string
   report_url: string

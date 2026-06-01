@@ -98,7 +98,7 @@ def get_all_projects(
         db, status=status, page=page, page_size=page_size,
         teacher_id=current_user.id, keyword=keyword,
     )
-    return paginated_success([format_project(db, p) for p in projects], total, page, page_size)
+    return paginated_success([format_project(db, p, current_user.id) for p in projects], total, page, page_size)
 
 
 @router.post("/projects/{project_id}/approve", summary="通过作品审核", description="教师端：将指定作品设为审核通过")

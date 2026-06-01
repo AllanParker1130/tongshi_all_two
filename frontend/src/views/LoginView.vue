@@ -32,6 +32,17 @@ const rules = {
   ],
 }
 
+async function navigateByRole() {
+  const role = authStore.user?.role
+  if (role === 'admin') {
+    await router.replace('/admin/teachers')
+  } else if (role === 'teacher') {
+    await router.replace('/teacher')
+  } else {
+    await router.replace('/')
+  }
+}
+
 async function handleLogin() {
   if (!form.id.trim() || !form.password.trim()) {
     ElMessage.warning('请填写完整信息')
@@ -46,13 +57,7 @@ async function handleLogin() {
       showChangePasswordDialog.value = true
     } else {
       ElMessage.success(`欢迎回来，${authStore.user!.name}`)
-      if (authStore.user!.role === 'admin') {
-        router.push('/admin/teachers')
-      } else if (authStore.user!.role === 'teacher') {
-        router.push('/teacher')
-      } else {
-        router.push('/')
-      }
+      await navigateByRole()
     }
   } else {
     ElMessageBox.alert('密码错误，请重试', '登录失败', {
@@ -115,10 +120,7 @@ async function handleFirstLoginChange() {
   if (ok) {
     ElMessage.success('密码修改成功')
     showChangePasswordDialog.value = false
-    const role = authStore.user?.role
-    if (role === 'admin') router.push('/admin/teachers')
-    else if (role === 'teacher') router.push('/teacher')
-    else router.push('/')
+    await navigateByRole()
   } else {
     ElMessage.error('修改失败，请检查当前密码是否正确')
   }
