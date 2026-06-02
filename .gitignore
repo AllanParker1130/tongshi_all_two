@@ -44,3 +44,9 @@ AGENTS.md
 .qoder/
 CLAUDE.md
 graphify-out/
+
+# 7. 本地缓存与工具脚本
+.python-version
+backend/.seed_lock
+backend/setup_mysql.sh
+tongshi_all_two/

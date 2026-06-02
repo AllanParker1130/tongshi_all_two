@@ -14,7 +14,6 @@ const courses = ref<Course[]>([])
 const loading = ref(true)
 const router = useRouter()
 const publicSearchKeyword = ref('')
-const publicCourseDefaultLimit = 6
 
 const myCourses = computed(() => courses.value.filter(course => !course.is_public))
 const publicCourses = computed(() => courses.value.filter(course => course.is_public))
@@ -22,10 +21,6 @@ const filteredPublicCourses = computed(() => {
   const keyword = publicSearchKeyword.value.trim().toLowerCase()
   if (!keyword) return publicCourses.value
   return publicCourses.value.filter(course => course.name.toLowerCase().includes(keyword))
-})
-const displayedPublicCourses = computed(() => {
-  if (publicSearchKeyword.value.trim()) return filteredPublicCourses.value
-  return publicCourses.value.slice(0, publicCourseDefaultLimit)
 })
 
 const dialogVisible = ref(false)
@@ -36,6 +31,52 @@ const formData = reactive({
   is_public: false,
 })
 const saving = ref(false)
+
+// 添加公共课程
+const addDialogVisible = ref(false)
+const addSearchKeyword = ref('')
+const addedCourseIds = ref<Set<number>>(new Set())
+const addingCourseIds = ref<Set<number>>(new Set())
+
+// 已添加到自己的课程名称集合（跨对话）
+const ownedCourseNames = computed(() => new Set(myCourses.value.map(c => c.name)))
+
+function isAlreadyOwned(course: Course) {
+  return addedCourseIds.value.has(course.id) || ownedCourseNames.value.has(course.name)
+}
+
+const searchablePublicCourses = computed(() => {
+  const keyword = addSearchKeyword.value.trim().toLowerCase()
+  let list = publicCourses.value.filter(c => !c.is_owner)
+  if (keyword) list = list.filter(c => c.name.toLowerCase().includes(keyword))
+  return [...list].sort((a, b) => {
+    const aAdded = isAlreadyOwned(a) ? 0 : 1
+    const bAdded = isAlreadyOwned(b) ? 0 : 1
+    return aAdded - bAdded
+  })
+})
+
+async function handleAddOneCourse(course: Course) {
+  if (isAlreadyOwned(course) || addingCourseIds.value.has(course.id)) return
+  addingCourseIds.value = new Set([...addingCourseIds.value, course.id])
+  try {
+    await createCourse({ name: course.name, is_public: false })
+    addedCourseIds.value = new Set([...addedCourseIds.value, course.id])
+    await loadCourses()
+  } catch {
+    ElMessage.error('添加失败，请稍后重试')
+  } finally {
+    const next = new Set(addingCourseIds.value)
+    next.delete(course.id)
+    addingCourseIds.value = next
+  }
+}
+
+function openAddDialog() {
+  addSearchKeyword.value = ''
+  addedCourseIds.value = new Set()
+  addDialogVisible.value = true
+}
 
 async function loadCourses() {
   loading.value = true
@@ -130,8 +171,11 @@ function formatDate(dateStr: string) {
 <template>
   <div class="courses-page">
     <div class="page-header">
-      <h1>课程管理</h1>
-      <el-button type="primary" round @click="openCreate">新建课程</el-button>
+      <h1>已添加课程</h1>
+      <div class="header-actions">
+        <el-button type="primary" round @click="openAddDialog">添加课程</el-button>
+        <el-button type="primary" round @click="openCreate">新建课程</el-button>
+      </div>
     </div>
 
     <el-table :data="myCourses" stripe style="width: 100%" v-loading="loading">
@@ -166,11 +210,10 @@ function formatDate(dateStr: string) {
     </div>
 
     <div class="section-header public-section-header">
-      <h2>公共课程</h2>
-      <span>默认展示 {{ displayedPublicCourses.length }} 门，共 {{ publicCourses.length }} 门</span>
+      <h2>公共课程 <span class="public-count">共 {{ publicCourses.length }} 门</span></h2>
     </div>
 
-    <el-table :data="displayedPublicCourses" stripe style="width: 100%" v-loading="loading">
+    <el-table :data="filteredPublicCourses" stripe style="width: 100%" max-height="240" v-loading="loading">
       <el-table-column type="index" label="序号" width="70" align="center" />
       <el-table-column prop="name" label="课程名称" min-width="200">
         <template #default="{ row }">
@@ -193,10 +236,9 @@ function formatDate(dateStr: string) {
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button text size="small" @click="openMaterials(row)">查看资料</el-button>
-          <el-button v-if="row.is_owner" text size="small" @click="openEdit(row)">编辑</el-button>
           <el-button v-if="row.is_owner" type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -214,7 +256,7 @@ function formatDate(dateStr: string) {
     <div v-if="!loading && publicCourses.length === 0" class="empty-state public-empty">
       <p>暂无公共课程</p>
     </div>
-    <div v-else-if="!loading && displayedPublicCourses.length === 0" class="empty-state public-empty">
+    <div v-else-if="!loading && filteredPublicCourses.length === 0" class="empty-state public-empty">
       <p>没有匹配的公共课程</p>
     </div>
 
@@ -245,12 +287,64 @@ function formatDate(dateStr: string) {
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 添加公共课程弹窗 -->
+    <el-dialog
+      v-model="addDialogVisible"
+      title="添加公共课程"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+      <el-input
+        v-model="addSearchKeyword"
+        placeholder="搜索课程名称"
+        size="large"
+        clearable
+        style="margin-bottom: var(--space-md)"
+      />
+      <el-table :data="searchablePublicCourses" stripe style="width: 100%" max-height="360">
+        <el-table-column prop="name" label="课程名称" min-width="200">
+          <template #default="{ row }">
+            <span>{{ row.name }}</span>
+            <el-tag class="public-tag" size="small" type="success" effect="plain">公共</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="资料" width="70" align="center">
+          <template #default="{ row }">
+            {{ row.material_count ?? 0 }}
+          </template>
+        </el-table-column>
+        <el-table-column label="题目" width="70" align="center">
+          <template #default="{ row }">
+            {{ row.question_count ?? '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="!isAlreadyOwned(row)"
+              type="primary"
+              text
+              size="small"
+              :loading="addingCourseIds.has(row.id)"
+              @click="handleAddOneCourse(row)"
+            >添加</el-button>
+            <el-tag v-else size="small" type="info">已添加</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="searchablePublicCourses.length === 0" class="empty-state" style="margin-top: var(--space-md)">
+        暂无可用公共课程
+      </div>
+      <template #footer>
+        <el-button @click="addDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <style scoped>
 .courses-page {
-  max-width: 960px;
 }
 
 .page-header {
@@ -260,23 +354,22 @@ function formatDate(dateStr: string) {
   margin-bottom: var(--space-lg);
 }
 
+.header-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
 .page-header h1 {
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
   color: var(--color-text);
-  margin: 0;
   font-family: var(--font-serif);
   letter-spacing: 0.05em;
 }
 
 .count-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  background: var(--color-primary-glow, #f0f4ff);
-  color: var(--color-primary, #4a6fa5);
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 .section-header {
@@ -308,13 +401,10 @@ function formatDate(dateStr: string) {
 }
 
 .empty-state {
-  margin-top: var(--space-xl);
   text-align: center;
-  color: var(--color-text-secondary);
+  padding: var(--space-3xl) 0;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
-  padding: var(--space-xl) 0;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
 }
 
 .public-empty {
@@ -322,15 +412,14 @@ function formatDate(dateStr: string) {
 }
 
 .form-group {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 .form-group label {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-sm);
 }
 
 .required {
