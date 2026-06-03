@@ -36,7 +36,43 @@ export function changePassword(data: { old_password: string; new_password: strin
   return http.put<any, { message: string }>('/change-password', data)
 }
 
-// 忘记密码（直接用学号/工号重置，无需登录）
+// 忘记密码（直接用学号/工号重置，无需登录）— 旧接口，保留兼容
 export function forgotPassword(data: { id: string; new_password: string }) {
   return http.post<any, { message: string }>('/password/forgot', data)
+}
+
+// ── 密保问题管理（需登录）─────────────────────────────────────────────
+
+export interface SecurityQuestionItem {
+  id: number
+  question: string
+}
+
+export function getSecurityQuestions() {
+  return http.get<any, SecurityQuestionItem[]>('/security-questions')
+}
+
+export function updateSecurityQuestions(data: { questions: { question: string; answer: string }[] }) {
+  return http.put<any, SecurityQuestionItem[]>('/security-questions', data)
+}
+
+// ── 忘记密码新流程（无需登录）─────────────────────────────────────────
+
+/** 获取指定用户的密保问题列表（只返回问题文本） */
+export function getForgotPasswordQuestions(userId: string) {
+  return http.get<any, SecurityQuestionItem[]>(`/password/forgot/questions?user_id=${encodeURIComponent(userId)}`)
+}
+
+/** 提交答案并重置密码 */
+export function resetPasswordWithAnswers(data: {
+  user_id: string
+  answers: { question_id: number; answer: string }[]
+  new_password: string
+}) {
+  return http.post<any, { message: string }>('/password/forgot/reset', data)
+}
+
+/** 提交人工密码重置申请 */
+export function submitPasswordResetRequest(data: { user_id: string; message: string }) {
+  return http.post<any, { message: string }>('/password/forgot/request', data)
 }

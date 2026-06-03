@@ -188,6 +188,11 @@ const router = createRouter({
           component: () => import('../views/admin/AdminShowcase.vue'),
           meta: { title: '内容管理', role: 'admin' },
         },
+        {
+          path: 'password-reset',
+          component: () => import('../views/admin/AdminPasswordReset.vue'),
+          meta: { title: '密码重置管理', role: 'admin' },
+        },
       ],
     },
     {

@@ -173,6 +173,8 @@ def ensure_schema_compatibility(engine) -> None:
         # ── users 表新增 needs_password_change 列 ────────────────────────
         _add_column_if_missing(
             conn, inspector, "users", "needs_password_change", "BOOLEAN NOT NULL DEFAULT 0")
+        _add_column_if_missing(
+            conn, inspector, "password_reset_requests", "temp_password", "VARCHAR(32) NULL")
 
         inspector = inspect(conn)
         table_names = set(inspector.get_table_names())
@@ -261,6 +263,82 @@ def ensure_schema_compatibility(engine) -> None:
             ))
             conn.execute(text(
                 "CREATE INDEX ix_announcement_classes_class_id ON announcement_classes (class_id)"
+            ))
+
+        # ── security_questions 表 ─────────────────────────────────────
+        inspector = inspect(conn)
+        table_names = set(inspector.get_table_names())
+        if "security_questions" not in table_names:
+            dialect_name = conn.dialect.name
+            if dialect_name == "sqlite":
+                conn.execute(text("""
+                    CREATE TABLE security_questions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id VARCHAR(32) NOT NULL,
+                        question VARCHAR(200) NOT NULL,
+                        answer_hash VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE security_questions (
+                        id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        user_id VARCHAR(32) NOT NULL,
+                        question VARCHAR(200) NOT NULL,
+                        answer_hash VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_security_questions_user_id
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                """))
+            conn.execute(text(
+                "CREATE INDEX ix_security_questions_user_id ON security_questions (user_id)"
+            ))
+
+        # ── password_reset_requests 表 ───────────────────────────────────
+        inspector = inspect(conn)
+        table_names = set(inspector.get_table_names())
+        if "password_reset_requests" not in table_names:
+            dialect_name = conn.dialect.name
+            if dialect_name == "sqlite":
+                conn.execute(text("""
+                    CREATE TABLE password_reset_requests (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id VARCHAR(32) NOT NULL,
+                        message TEXT NOT NULL,
+                        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                        resolved_by VARCHAR(32),
+                        new_password_hash VARCHAR(255),
+                        resolved_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY(resolved_by) REFERENCES users(id)
+                    )
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE password_reset_requests (
+                        id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        user_id VARCHAR(32) NOT NULL,
+                        message TEXT NOT NULL,
+                        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                        resolved_by VARCHAR(32) NULL,
+                        new_password_hash VARCHAR(255) NULL,
+                        resolved_at TIMESTAMP NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_password_reset_requests_user_id
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_password_reset_requests_resolved_by
+                            FOREIGN KEY (resolved_by) REFERENCES users(id)
+                    )
+                """))
+            conn.execute(text(
+                "CREATE INDEX ix_password_reset_requests_user_id ON password_reset_requests (user_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX ix_password_reset_requests_resolved_by ON password_reset_requests (resolved_by)"
             ))
 
 

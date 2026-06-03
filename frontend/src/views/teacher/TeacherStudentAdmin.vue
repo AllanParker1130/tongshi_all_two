@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { enrollStudent, getClasses, getClassStudents, importStudents, unenrollStudent, type ClassInfo, type ClassStudent } from '@/api/class'
-import { batchDeleteStudents } from '@/api/teacher'
+import { batchDeleteStudents, getPasswordResetRequests, approvePasswordResetRequest, rejectPasswordResetRequest, type PasswordResetRequest } from '@/api/teacher'
 
 const route = useRoute()
 const classes = ref<ClassInfo[]>([])
@@ -154,6 +154,65 @@ async function handleImport() {
   }
 }
 
+watch(selectedClassId, () => {
+  loadStudents()
+})
+
+// 密码重置申请管理
+const resetRequests = ref<PasswordResetRequest[]>([])
+const resetRequestsLoading = ref(false)
+const resetStatusFilter = ref('pending')
+
+async function loadResetRequests() {
+  resetRequestsLoading.value = true
+  try {
+    resetRequests.value = await getPasswordResetRequests(resetStatusFilter.value)
+  } catch {
+    resetRequests.value = []
+  } finally {
+    resetRequestsLoading.value = false
+  }
+}
+
+function switchResetFilter(status: string) {
+  resetStatusFilter.value = status
+  loadResetRequests()
+}
+
+async function handleApproveReset(requestId: number) {
+  try {
+    const result = await approvePasswordResetRequest(requestId)
+    ElMessageBox.alert(`临时密码：<b>${result.temp_password}</b><br/>请告知学生，首次登录后需修改密码。`, '密码已重置', {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '复制并关闭',
+      type: 'success',
+    }).then(() => {
+      navigator.clipboard.writeText(result.temp_password)
+    })
+    await loadResetRequests()
+  } catch {
+    // 拦截器已显示错误或用户取消弹窗
+  }
+}
+
+async function handleRejectReset(requestId: number) {
+  try {
+    await ElMessageBox.prompt('请输入驳回原因（可选）', '驳回申请', { inputType: 'textarea', confirmButtonText: '确认驳回' })
+  } catch { return }
+  try {
+    await rejectPasswordResetRequest(requestId)
+    ElMessage.success('已驳回')
+    await loadResetRequests()
+  } catch {
+    // 拦截器已显示错误
+  }
+}
+
+function copyTempPassword(pwd: string) {
+  navigator.clipboard.writeText(pwd)
+  ElMessage.success('已复制临时密码')
+}
+
 onMounted(async () => {
   await loadClasses()
   const classId = Number(route.query.class_id)
@@ -163,10 +222,7 @@ onMounted(async () => {
     selectedClassId.value = classes.value[0]?.id ?? ''
   }
   await loadStudents()
-})
-
-watch(selectedClassId, () => {
-  loadStudents()
+  loadResetRequests()
 })
 </script>
 
@@ -231,6 +287,60 @@ watch(selectedClassId, () => {
         <el-button type="primary" @click="handleEnroll">添加</el-button>
       </template>
     </el-dialog>
+
+    <!-- 密码重置管理 -->
+    <el-card class="reset-card" style="margin-top:24px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:700;font-size:1rem">🔑 密码重置管理</span>
+          <el-radio-group v-model="resetStatusFilter" size="small" @change="(v: string) => switchResetFilter(v)">
+            <el-radio-button value="pending">待处理</el-radio-button>
+            <el-radio-button value="approved">已通过</el-radio-button>
+            <el-radio-button value="rejected">已驳回</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
+      <el-table :data="resetRequests" v-loading="resetRequestsLoading" empty-text="暂无相关记录" stripe>
+        <el-table-column prop="user_name" label="学生" width="110" />
+        <el-table-column prop="user_id" label="学号" width="110" />
+        <el-table-column prop="message" label="留言" min-width="160" show-overflow-tooltip />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 'pending'" type="warning" size="small">待处理</el-tag>
+            <el-tag v-else-if="row.status === 'approved'" type="success" size="small">已通过</el-tag>
+            <el-tag v-else type="info" size="small">已驳回</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="临时密码" width="130">
+          <template #default="{ row }">
+            <template v-if="row.status === 'approved' && row.temp_password">
+              <code style="font-size:0.82rem">{{ row.temp_password }}</code>
+              <el-button link type="primary" size="small" @click="copyTempPassword(row.temp_password)">复制</el-button>
+            </template>
+            <span v-else style="color:#999">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="处理人" width="100">
+          <template #default="{ row }">
+            {{ row.resolved_by_name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="申请时间" width="170">
+          <template #default="{ row }">
+            {{ row.created_at ? new Date(row.created_at).toLocaleString() : '' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row.status === 'pending'">
+              <el-button type="success" size="small" @click="handleApproveReset(row.id)">重置</el-button>
+              <el-button type="danger" size="small" @click="handleRejectReset(row.id)">驳回</el-button>
+            </template>
+            <span v-else style="color:#999;font-size:0.8rem">{{ row.resolved_at ? new Date(row.resolved_at).toLocaleString().split(' ')[0] : '' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <el-dialog v-model="importDialogVisible" title="Excel 批量导入学生" width="480px">
       <div class="import-info">

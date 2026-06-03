@@ -47,3 +47,31 @@ export function importTeachers(file: File) {
 export function changePassword(data: { old_password: string; new_password: string }) {
     return http.put<any, any>('/change-password', data)
 }
+
+// ── 密码重置申请管理 ──────────────────────────────────────────────────
+
+export interface PasswordResetRequest {
+    id: number
+    user_id: string
+    user_name: string
+    message: string
+    status: string
+    resolved_by: string | null
+    resolved_by_name: string
+    temp_password: string
+    resolved_at: string
+    created_at: string
+}
+
+export function getAdminPasswordResetRequests(status?: string) {
+    const params = status ? `?status=${encodeURIComponent(status)}` : ''
+    return http.get<any, PasswordResetRequest[]>(`/admin/password-reset-requests${params}`)
+}
+
+export function adminApprovePasswordResetRequest(requestId: number) {
+    return http.post<any, { message: string; temp_password: string }>(`/admin/password-reset-requests/${requestId}/approve`)
+}
+
+export function adminRejectPasswordResetRequest(requestId: number, reason?: string) {
+    return http.post<any, { message: string }>(`/admin/password-reset-requests/${requestId}/reject`, { reason: reason || '' })
+}

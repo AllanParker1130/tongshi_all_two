@@ -8,7 +8,12 @@ from app.core.security import require_role, get_password_hash
 from app.core.response import success
 from app.core.exceptions import BusinessException
 from app.models.entities import User
-from app.schemas.common import AuthUser, CreateTeacherRequest, TeacherInfo
+from app.schemas.common import AuthUser, CreateTeacherRequest, TeacherInfo, ResetRequestResolve
+from app.services.auth_service import (
+    get_reset_requests_for_admin,
+    approve_reset_request,
+    reject_reset_request,
+)
 
 router = APIRouter()
 
@@ -150,3 +155,33 @@ def delete_teacher(
     db.delete(teacher)
     db.commit()
     return success({"message": "删除成功"})
+
+
+# ── 密码重置申请管理（管理员端）─────────────────────────────────────────
+
+@router.get("/password-reset-requests", summary="获取密码重置申请", description="管理员：查看所有密码重置申请，可选 status 筛选")
+def list_all_reset_requests(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(require_role("admin")),
+):
+    return success(get_reset_requests_for_admin(db, status))
+
+
+@router.post("/password-reset-requests/{request_id}/approve", summary="审批密码重置", description="管理员：审批通过任意密码重置申请")
+def admin_approve_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("admin")),
+):
+    return success(approve_reset_request(db, request_id, current_user.id))
+
+
+@router.post("/password-reset-requests/{request_id}/reject", summary="驳回密码重置", description="管理员：驳回任意密码重置申请")
+def admin_reject_request(
+    request_id: int,
+    data: ResetRequestResolve,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("admin")),
+):
+    return success(reject_reset_request(db, request_id, current_user.id, data.reason))

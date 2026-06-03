@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getWrongQuestions, getLikedProjects, type WrongQuestion, type LikedProject } from '@/api/profile'
+import { getSecurityQuestions, updateSecurityQuestions, type SecurityQuestionItem } from '@/api/auth'
 import { resolveFileUrl } from '@/utils/url'
 import { useRouter } from 'vue-router'
 
@@ -36,6 +37,59 @@ async function handleChangePassword() {
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
   } else {
     ElMessage.error('修改失败，请检查当前密码是否正确')
+  }
+}
+
+// 密保问题
+const securityQuestions = ref<SecurityQuestionItem[]>([])
+const securityLoading = ref(false)
+const securityEditQuestions = ref<{ question: string; answer: string }[]>([{ question: '', answer: '' }])
+const securityEditMode = ref(false)
+
+async function loadSecurityQuestions() {
+  securityLoading.value = true
+  try {
+    securityQuestions.value = await getSecurityQuestions()
+  } catch {
+    securityQuestions.value = []
+  } finally {
+    securityLoading.value = false
+  }
+}
+
+function startEditSecurity() {
+  securityEditQuestions.value = securityQuestions.value.length > 0
+    ? securityQuestions.value.map(q => ({ question: q.question, answer: '' }))
+    : [{ question: '', answer: '' }]
+  securityEditMode.value = true
+}
+
+function cancelEditSecurity() {
+  securityEditMode.value = false
+}
+
+function addSecurityEdit() {
+  if (securityEditQuestions.value.length < 3) {
+    securityEditQuestions.value.push({ question: '', answer: '' })
+  }
+}
+
+function removeSecurityEdit(index: number) {
+  securityEditQuestions.value.splice(index, 1)
+}
+
+async function saveSecurityEdit() {
+  const valid = securityEditQuestions.value.filter(q => q.question.trim() && q.answer.trim())
+  securityLoading.value = true
+  try {
+    await updateSecurityQuestions({ questions: valid.map(q => ({ question: q.question.trim(), answer: q.answer.trim() })) })
+    ElMessage.success('密保问题已更新')
+    securityEditMode.value = false
+    await loadSecurityQuestions()
+  } catch {
+    // 拦截器已显示错误
+  } finally {
+    securityLoading.value = false
   }
 }
 
@@ -79,6 +133,9 @@ function handleTabChange(name: string) {
   }
   if (name === 'liked-projects' && likedProjects.value.length === 0 && !likedLoading.value) {
     loadLikedProjects()
+  }
+  if (name === 'security-questions' && securityQuestions.value.length === 0 && !securityLoading.value) {
+    loadSecurityQuestions()
   }
 }
 </script>
@@ -134,7 +191,46 @@ function handleTabChange(name: string) {
         </div>
       </el-tab-pane>
 
-      <!-- Tab 2：错题本 -->
+      <!-- Tab：密保问题 -->
+      <el-tab-pane label="密保问题" name="security-questions">
+        <div class="tab-content">
+          <!-- 查看模式 -->
+          <template v-if="!securityEditMode">
+            <div v-if="securityQuestions.length === 0 && !securityLoading" class="empty-hint">
+              暂未设置密保问题
+            </div>
+            <div v-for="q in securityQuestions" :key="q.id" class="form-item">
+              <label>{{ q.question }}</label>
+              <el-input value="******" disabled style="max-width: 360px" />
+            </div>
+            <div class="form-item">
+              <el-button type="primary" :loading="securityLoading" @click="startEditSecurity">
+                {{ securityQuestions.length > 0 ? '修改密保问题' : '设置密保问题' }}
+              </el-button>
+            </div>
+          </template>
+          <!-- 编辑模式 -->
+          <template v-else>
+            <div v-for="(item, index) in securityEditQuestions" :key="index" class="form-item">
+              <label>问题 {{ index + 1 }}</label>
+              <div style="display:flex;gap:8px;max-width:500px">
+                <el-input v-model="item.question" placeholder="自定义问题，如：你最喜欢的动物？" />
+                <el-input v-model="item.answer" placeholder="答案" style="width:140px;flex-shrink:0" type="password" show-password />
+                <el-button v-if="securityEditQuestions.length > 1" :icon="'Delete'" circle size="small" @click="removeSecurityEdit(index)" />
+              </div>
+            </div>
+            <el-button v-if="securityEditQuestions.length < 3" type="primary" link @click="addSecurityEdit" style="margin-bottom:8px">
+              + 添加问题（{{ securityEditQuestions.length }}/3）
+            </el-button>
+            <div class="form-item">
+              <el-button :loading="securityLoading" @click="cancelEditSecurity">取消</el-button>
+              <el-button type="primary" :loading="securityLoading" @click="saveSecurityEdit">保存</el-button>
+            </div>
+          </template>
+        </div>
+      </el-tab-pane>
+
+      <!-- Tab：错题本 -->
       <el-tab-pane label="错题本" name="wrong-questions">
         <div class="tab-content">
           <div v-if="wrongLoading" class="loading-state">

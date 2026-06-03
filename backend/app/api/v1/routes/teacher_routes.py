@@ -17,11 +17,16 @@ from app.db.session import get_db
 from app.core.security import require_role
 from app.core.response import success, paginated_success
 from app.core.exceptions import BusinessException
-from app.schemas.common import AuthUser, ProjectReviewAction
+from app.schemas.common import AuthUser, ProjectReviewAction, ResetRequestResolve
 from app.services.teacher_service import get_teacher_stats, list_students, list_all_projects
 from app.services.project_service import approve_project, reject_project, delete_project, format_project
 from app.services.class_service import _delete_student_data
 from app.services.file_service import resolve_file_stream
+from app.services.auth_service import (
+    get_reset_requests_for_teacher,
+    approve_reset_request,
+    reject_reset_request,
+)
 from app.models.entities import User, Project, Class
 from openpyxl import Workbook
 
@@ -388,3 +393,33 @@ def export_students_excel(
         headers={
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
     )
+
+
+# ── 密码重置申请管理 ────────────────────────────────────────────────────
+
+@router.get("/password-reset-requests", summary="获取密码重置申请", description="教师：查看本班学生的密码重置申请，可选 status 筛选（pending/approved/rejected）")
+def list_reset_requests(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("teacher")),
+):
+    return success(get_reset_requests_for_teacher(db, current_user.id, status))
+
+
+@router.post("/password-reset-requests/{request_id}/approve", summary="审批密码重置", description="教师：审批通过本班学生的密码重置申请")
+def approve_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("teacher")),
+):
+    return success(approve_reset_request(db, request_id, current_user.id))
+
+
+@router.post("/password-reset-requests/{request_id}/reject", summary="驳回密码重置", description="教师：驳回本班学生的密码重置申请")
+def reject_request(
+    request_id: int,
+    data: ResetRequestResolve,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("teacher")),
+):
+    return success(reject_reset_request(db, request_id, current_user.id, data.reason))

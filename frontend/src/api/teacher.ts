@@ -105,3 +105,31 @@ export async function downloadProjectReportsZip() {
   const filename = resolveDownloadFilename(response.headers.get('content-disposition'))
   return { blob, filename }
 }
+
+// ── 密码重置申请管理 ──────────────────────────────────────────────────
+
+export interface PasswordResetRequest {
+  id: number
+  user_id: string
+  user_name: string
+  message: string
+  status: string
+  resolved_by: string | null
+  resolved_by_name: string
+  temp_password: string
+  resolved_at: string
+  created_at: string
+}
+
+export function getPasswordResetRequests(status?: string) {
+  const params = status ? `?status=${encodeURIComponent(status)}` : ''
+  return http.get<any, PasswordResetRequest[]>(`/teacher/password-reset-requests${params}`)
+}
+
+export function approvePasswordResetRequest(requestId: number) {
+  return http.post<any, { message: string; temp_password: string }>(`/teacher/password-reset-requests/${requestId}/approve`)
+}
+
+export function rejectPasswordResetRequest(requestId: number, reason: string = '') {
+  return http.post<any, { message: string }>(`/teacher/password-reset-requests/${requestId}/reject`, { reason })
+}

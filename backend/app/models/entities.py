@@ -352,3 +352,34 @@ class ShowcaseItemImage(Base):
 
     showcase_item = relationship("ShowcaseItem", back_populates="images")
     file = relationship("StoredFile")
+
+
+class SecurityQuestion(Base):
+    """用户密保问题"""
+    __tablename__ = "security_questions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    question = Column(String(200), nullable=False)
+    answer_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User")
+
+
+class PasswordResetRequest(Base):
+    """密码重置申请（人工审批）"""
+    __tablename__ = "password_reset_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending / approved / rejected
+    resolved_by = Column(String(32), ForeignKey("users.id"), nullable=True, index=True)
+    new_password_hash = Column(String(255), nullable=True)
+    temp_password = Column(String(32), nullable=True)  # 审批时生成的临时密码明文（学生首次登录后即改）
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    applicant = relationship("User", foreign_keys=[user_id])
+    resolver = relationship("User", foreign_keys=[resolved_by])

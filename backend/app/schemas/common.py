@@ -370,7 +370,7 @@ class TeacherInfo(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    """忘记密码请求：直接通过学号/工号重置密码"""
+    """忘记密码（已废弃，请使用新的两步验证流程）"""
     id: str
     new_password: str = Field(min_length=6)
 
@@ -381,6 +381,68 @@ class ForgotPasswordRequest(BaseModel):
         if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
             raise ValueError("密码必须包含至少一个字母和一个数字")
         return v
+
+
+# ── 密保问题 ─────────────────────────────────────────────────────────────
+
+class SecurityQuestionItem(BaseModel):
+    """单个密保问题"""
+    question: str = Field(min_length=1, max_length=200)
+
+
+class SecurityQuestionIn(BaseModel):
+    """设置密保问题（含答案）"""
+    question: str = Field(min_length=1, max_length=200)
+    answer: str = Field(min_length=1, max_length=100)
+
+
+class SecurityQuestionsUpdate(BaseModel):
+    """批量设置密保问题"""
+    questions: list[SecurityQuestionIn] = Field(min_length=0, max_length=3)
+
+
+class SecurityQuestionOut(BaseModel):
+    """密保问题输出（不含答案）"""
+    id: int
+    question: str
+
+
+class ForgotPasswordCheckRequest(BaseModel):
+    """忘记密码 — 提交答案验证"""
+    user_id: str
+    answers: list[dict]  # [{question_id: int, answer: str}]
+    new_password: str = Field(min_length=6)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        import re
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError("密码必须包含至少一个字母和一个数字")
+        return v
+
+
+class ForgotPasswordManualRequest(BaseModel):
+    """忘记密码 — 提交人工重置申请"""
+    user_id: str
+    message: str = Field(min_length=1, max_length=500)
+
+
+class ResetRequestResolve(BaseModel):
+    """审批密码重置请求"""
+    reason: str = Field(default="", max_length=256)
+
+
+class ResetRequestOut(BaseModel):
+    """密码重置请求输出"""
+    id: int
+    user_id: str
+    user_name: str = ""
+    message: str
+    status: str
+    resolved_by: Optional[str] = None
+    resolved_at: Optional[str] = None
+    created_at: str = ""
 
 
 # ===== Showcase（悟页面图文内容）=====

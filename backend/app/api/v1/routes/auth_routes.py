@@ -6,8 +6,17 @@ from app.db.session import get_db
 from app.core.security import get_current_user, verify_password, get_password_hash
 from app.core.response import success
 from app.core.exceptions import BusinessException
-from app.schemas.common import AuthUser, LoginRequest, RegisterRequest, ChangePasswordRequest, ForgotPasswordRequest
-from app.services.auth_service import login_user, register_user, forgot_password as forgot_password_svc
+from app.schemas.common import (
+    AuthUser, LoginRequest, RegisterRequest, ChangePasswordRequest,
+    ForgotPasswordRequest, ForgotPasswordCheckRequest,
+    ForgotPasswordManualRequest, SecurityQuestionsUpdate,
+)
+from app.services.auth_service import (
+    login_user, register_user,
+    get_security_questions, update_security_questions,
+    get_forgot_password_questions, verify_answers_and_reset_password,
+    submit_reset_request,
+)
 from app.models.entities import User
 
 router = APIRouter(tags=["auth"])
@@ -40,17 +49,61 @@ def change_password(
         raise BusinessException(404, "用户不存在")
     if not verify_password(req.old_password, user.hashed_password):
         raise BusinessException(400, "旧密码不正确")
-    # 新密码复杂度已在 Schema 层校验
     user.hashed_password = get_password_hash(req.new_password)
     user.needs_password_change = False
     db.commit()
     return success({"message": "密码修改成功"})
 
 
-@router.post("/password/forgot", summary="忘记密码（直接重置）")
+# ── 密保问题管理（需登录）───────────────────────────────────────────────
+
+@router.get("/security-questions", summary="获取密保问题", description="返回当前用户设置的密保问题（只返回问题文本，不含答案）")
+def list_security_questions(
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(get_current_user),
+):
+    return success(get_security_questions(db, current_user.id))
+
+
+@router.put("/security-questions", summary="设置密保问题", description="整体替换密保问题，最多 3 个，传空列表表示清空")
+def set_security_questions(
+    data: SecurityQuestionsUpdate,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(get_current_user),
+):
+    items = [{"question": q.question, "answer": q.answer} for q in data.questions]
+    return success(update_security_questions(db, current_user.id, items))
+
+
+# ── 忘记密码流程（无需登录）─────────────────────────────────────────────
+
+@router.get("/password/forgot/questions", summary="忘记密码—获取密保问题", description="根据学号获取该用户的密保问题（仅返回问题文本）")
+def forgot_password_questions(user_id: str, db: Session = Depends(get_db)):
+    return success(get_forgot_password_questions(db, user_id))
+
+
+@router.post("/password/forgot/reset", summary="忘记密码—验证答案并重置", description="回答密保问题后重置密码")
+def forgot_password_reset(data: ForgotPasswordCheckRequest, db: Session = Depends(get_db)):
+    return success(verify_answers_and_reset_password(
+        db, data.user_id, data.answers, data.new_password
+    ))
+
+
+@router.post("/password/forgot/request", summary="忘记密码—提交人工重置申请", description="未设置密保或无法回答时，提交留言申请人工重置")
+def forgot_password_request(data: ForgotPasswordManualRequest, db: Session = Depends(get_db)):
+    return success(submit_reset_request(db, data.user_id, data.message))
+
+
+@router.post("/password/forgot", summary="忘记密码（兜底兼容）")
 def forgot_password_route(
     data: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """忘记密码：无需登录，直接用学号/工号重置密码"""
-    return success(forgot_password_svc(db, data.id, data.new_password))
+    """旧接口保留兼容：直接用学号重置密码（前端逐步迁移到新流程）"""
+    user = db.query(User).filter(User.id == data.id).first()
+    if not user:
+        raise BusinessException(404, "学号不存在")
+    user.hashed_password = get_password_hash(data.new_password)
+    user.needs_password_change = False
+    db.commit()
+    return success({"message": "密码重置成功"})

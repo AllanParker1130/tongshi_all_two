@@ -10,6 +10,7 @@ const navItems = [
   { name: '教师管理', path: '/admin/teachers', icon: '&#9783;' },
   { name: '公共课程', path: '/admin/public-courses', icon: '&#9670;' },
   { name: '内容管理', path: '/admin/showcase', icon: '&#128196;' },
+  { name: '密码重置', path: '/admin/password-reset', icon: '&#128273;' },
 ]
 
 function isActive(path: string) {
