@@ -114,6 +114,35 @@ def _delete_student_data(db: Session, student_id: str):
                           "student").delete(synchronize_session=False)
 
 
+def update_class(db: Session, class_id: int, teacher_id: str, name: str | None = None, course_id: int | None = None):
+    cls = _owned_class_query(db, teacher_id).filter(Class.id == class_id).first()
+    if not cls:
+        return None
+    if course_id is not None:
+        course = _accessible_course_query(db, teacher_id).filter(Course.id == course_id).first()
+        if not course:
+            raise BusinessException(404, "课程不存在")
+        # 检查同名班级
+        check_name = (name or cls.name).strip()
+        existing = db.query(Class).filter(
+            Class.name == check_name, Class.course_id == course_id,
+            Class.created_by == teacher_id, Class.id != class_id,
+        ).first()
+        if existing:
+            raise BusinessException(400, "该课程下已存在同名班级")
+        cls.course_id = course_id
+    if name is not None and name.strip():
+        cls.name = name.strip()
+    try:
+        db.commit()
+        db.refresh(cls)
+        logger.info(f"班级更新: id={class_id}, name={cls.name}, course_id={cls.course_id}")
+    except SQLAlchemyError:
+        db.rollback()
+        raise BusinessException(500, "更新班级失败")
+    return cls
+
+
 def delete_class(db: Session, class_id: int, teacher_id: str):
     cls = _owned_class_query(db, teacher_id).filter(Class.id == class_id).first()
     if not cls:
@@ -171,7 +200,7 @@ def list_class_students(db: Session, class_id: int, teacher_id: str):
     return result
 
 
-def enroll_student(db: Session, class_id: int, student_id: str, teacher_id: str, name: str = ""):
+def enroll_student(db: Session, class_id: int, student_id: str, teacher_id: str, name: str = "", major: str = ""):
     # 查找班级是否存在
     cls = _owned_class_query(db, teacher_id).filter(Class.id == class_id).first()
     if not cls:
@@ -188,13 +217,19 @@ def enroll_student(db: Session, class_id: int, student_id: str, teacher_id: str,
             name=name,
             hashed_password=get_password_hash(DEFAULT_PASSWORD),
             role="student",
-            major="",
+            major=major.strip() if major else "",
             needs_password_change=True,
         )
         db.add(student)
         db.flush()
         logger.info(
             f"自动创建学生账号: student_id={student_id}, name={name}, class_id={class_id}")
+    elif name and name.strip() and student.name != name.strip():
+        raise BusinessException(400, f"学号 {student_id} 对应姓名为「{student.name}」，与您输入的「{name.strip()}」不一致，请核对")
+    else:
+        # 已有学生：如果提供了专业且与现有不同，则更新
+        if major and major.strip() and student.major != major.strip():
+            student.major = major.strip()
 
     if student.role != "student":
         raise BusinessException(400, "仅可添加学生账号")

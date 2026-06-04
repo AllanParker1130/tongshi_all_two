@@ -9,9 +9,9 @@ from app.core.security import require_role
 from app.core.response import success
 from app.core.exceptions import BusinessException
 from app.core.upload_validation import validate_upload, ALLOWED_EXCEL_EXTENSIONS, MAX_EXCEL_SIZE
-from app.schemas.common import AuthUser, ClassCreate, ClassEnrollRequest
+from app.schemas.common import AuthUser, ClassCreate, ClassUpdate, ClassEnrollRequest
 from app.services.class_service import (
-    list_classes, create_class, delete_class,
+    list_classes, create_class, update_class, delete_class,
     list_class_students, enroll_student, remove_student,
     import_students_from_excel,
 )
@@ -35,6 +35,14 @@ def post_class(data: ClassCreate, db: Session = Depends(get_db), current_user: A
     return success({"id": cls.id})
 
 
+@router.put("/{class_id}", summary="编辑班级", description="教师端：修改班级名称或所属课程")
+def edit_class(class_id: int, data: ClassUpdate, db: Session = Depends(get_db), current_user: AuthUser = Depends(require_role("teacher"))):
+    cls = update_class(db, class_id, current_user.id, name=data.name, course_id=data.course_id)
+    if not cls:
+        raise BusinessException(404, "班级不存在")
+    return success()
+
+
 @router.delete("/{class_id}", summary="删除班级", description="教师端：删除班级及所有注册关系")
 def remove_class(class_id: int, db: Session = Depends(get_db), current_user: AuthUser = Depends(require_role("teacher"))):
     cls = delete_class(db, class_id, current_user.id)
@@ -54,7 +62,7 @@ def get_students(class_id: int, db: Session = Depends(get_db), current_user: Aut
 @router.post("/{class_id}/enroll", summary="添加学生", description="教师端：将学生手动添加到班级；学号不存在时若提供姓名则自动建号")
 def add_student(class_id: int, data: ClassEnrollRequest, db: Session = Depends(get_db), current_user: AuthUser = Depends(require_role("teacher"))):
     enrollment, status = enroll_student(
-        db, class_id, data.student_id, current_user.id, data.name)
+        db, class_id, data.student_id, current_user.id, data.name, data.major)
     return success({"status": status})
 
 

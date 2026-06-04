@@ -58,6 +58,11 @@ class ClassCreate(BaseModel):
     course_id: int
 
 
+class ClassUpdate(BaseModel):
+    name: Optional[str] = None
+    course_id: Optional[int] = None
+
+
 class ClassStudentOut(BaseModel):
     serial_no: int = 0
     id: str
@@ -76,6 +81,7 @@ class ClassImportResult(BaseModel):
 class ClassEnrollRequest(BaseModel):
     student_id: str = Field(min_length=1)
     name: str = ""  # 姓名，为空时仅添加已存在账号；非空时可自动创建账号
+    major: str = ""  # 专业，自动创建时写入；已有学生若提供则更新
 
 
 class AnnouncementCreate(BaseModel):

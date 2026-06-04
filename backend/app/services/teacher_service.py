@@ -79,21 +79,41 @@ def list_students(db: Session, teacher_id: str, class_id: int = None, page: int 
             (User.id.like(f"%{keyword}%")) | (User.name.like(f"%{keyword}%"))
         )
     query = query.order_by(Class.id.asc(), StudentClassEnrollment.import_order.asc(), User.id.asc())
-    total = query.count()
+    rows = query.all()
+
+    # 按学生 ID 去重：同一学生在多个班级时合并班级信息
+    student_class_ids: dict[str, set[int]] = {}
+    student_class_names: dict[str, list[str]] = {}
+    student_first_enrollment: dict[str, StudentClassEnrollment] = {}
+    student_user: dict[str, User] = {}
+    for s, enrollment, class_ in rows:
+        student_class_ids.setdefault(s.id, set()).add(class_.id)
+        student_class_names.setdefault(s.id, []).append(class_.name)
+        if s.id not in student_first_enrollment:
+            student_first_enrollment[s.id] = enrollment
+        student_user[s.id] = s
+
+    unique_student_ids = list(student_user.keys())
+    total = len(unique_student_ids)
+
+    # 按当前排序规则排序：class_id asc, import_order asc
+    unique_student_ids.sort(key=lambda sid: (
+        min(student_class_ids[sid]) if student_class_ids[sid] else 0,
+        student_first_enrollment[sid].import_order or 0,
+        sid,
+    ))
+
+    # 分页
     if page and page_size:
-        rows = query.offset((page - 1) * page_size).limit(page_size).all()
+        paged_ids = unique_student_ids[(page - 1) * page_size: page * page_size]
     else:
-        rows = query.all()
+        paged_ids = unique_student_ids
 
-    student_ids = list({s.id for s, _, _ in rows})
-    student_class_ids: dict[str, set[int]] = {student_id: set() for student_id in student_ids}
+    # 任务与完成数据
     class_task_ids: dict[int, set[int]] = {}
-    completed_task_ids: dict[str, set[int]] = {student_id: set() for student_id in student_ids}
+    completed_task_ids: dict[str, set[int]] = {sid: set() for sid in paged_ids}
 
-    if student_ids:
-        for student, _, class_ in rows:
-            student_class_ids.setdefault(student.id, set()).add(class_.id)
-
+    if paged_ids:
         task_rows = (
             db.query(Announcement.id, AnnouncementClass.class_id)
             .join(AnnouncementClass, AnnouncementClass.announcement_id == Announcement.id)
@@ -113,7 +133,7 @@ def list_students(db: Session, teacher_id: str, class_id: int = None, page: int 
             completion_rows = (
                 db.query(TaskCompletion.user_id, TaskCompletion.announcement_id)
                 .filter(
-                    TaskCompletion.user_id.in_(student_ids),
+                    TaskCompletion.user_id.in_(paged_ids),
                     TaskCompletion.announcement_id.in_(all_task_ids),
                 )
                 .all()
@@ -122,12 +142,17 @@ def list_students(db: Session, teacher_id: str, class_id: int = None, page: int 
                 completed_task_ids.setdefault(user_id, set()).add(task_id)
 
     result = []
-    for s, enrollment, class_ in rows:
+    for sid in paged_ids:
+        s = student_user[sid]
+        enrollment = student_first_enrollment[sid]
+        class_id_list = list(student_class_ids[sid])
+        class_name_str = "、".join(student_class_names[sid])
+
         progresses = (
             db.query(StudentProgress)
             .join(Course, Course.id == StudentProgress.course_id)
             .filter(
-                StudentProgress.user_id == s.id,
+                StudentProgress.user_id == sid,
                 StudentProgress.course_id.in_(
                     db.query(Class.course_id).filter(Class.id.in_(class_ids))
                 ),
@@ -142,20 +167,20 @@ def list_students(db: Session, teacher_id: str, class_id: int = None, page: int 
         avg_accuracy = int(total_accuracy / len(progresses)) if progresses else 0
 
         assigned_task_ids: set[int] = set()
-        for owned_class_id in student_class_ids.get(s.id, set()):
-            assigned_task_ids.update(class_task_ids.get(owned_class_id, set()))
-        completed_count = len(assigned_task_ids & completed_task_ids.get(s.id, set()))
+        for cid in class_id_list:
+            assigned_task_ids.update(class_task_ids.get(cid, set()))
+        completed_count = len(assigned_task_ids & completed_task_ids.get(sid, set()))
         total_task_count = len(assigned_task_ids)
         incomplete_count = max(total_task_count - completed_count, 0)
         task_completion_rate = int(round(completed_count / total_task_count * 100)) if total_task_count else 0
 
         result.append({
             "serial_no": enrollment.import_order or 0,
-            "id": s.id,
+            "id": sid,
             "name": s.name,
             "major": s.major or "",
-            "class_id": class_.id,
-            "class_name": class_.name,
+            "class_id": class_id_list[0] if class_id_list else None,
+            "class_name": class_name_str,
             "progress": avg_progress,
             "exercises": total_done,
             "accuracy": avg_accuracy,

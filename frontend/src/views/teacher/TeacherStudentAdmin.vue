@@ -14,6 +14,7 @@ const enrollDialogVisible = ref(false)
 const importDialogVisible = ref(false)
 const studentId = ref('')
 const studentName = ref('')
+const studentMajor = ref('')
 const importFile = ref<File | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
@@ -44,6 +45,7 @@ async function loadStudents() {
 function openEnroll() {
   studentId.value = ''
   studentName.value = ''
+  studentMajor.value = ''
   enrollDialogVisible.value = true
 }
 
@@ -52,12 +54,31 @@ async function handleEnroll() {
     ElMessage.warning('请先选择班级')
     return
   }
-  if (!studentId.value.trim() || !studentName.value.trim()) {
+  const rawId = studentId.value.trim()
+  const rawName = studentName.value.trim()
+  if (!rawId || !rawName) {
     ElMessage.warning('请输入学号和姓名')
     return
   }
+  // 学号应包含数字，不应包含中文；姓名反之
+  const hasChinese = (s: string) => /[一-鿿]/.test(s)
+  const hasDigit = (s: string) => /\d/.test(s)
+  const isDigitsOnly = (s: string) => /^\d+$/.test(s)
+
+  if (hasChinese(rawId)) {
+    ElMessage.warning('学号不应包含中文，请检查是否将姓名填入了学号栏')
+    return
+  }
+  if (!hasDigit(rawId)) {
+    ElMessage.warning('学号应包含数字，请检查学号是否填写正确')
+    return
+  }
+  if (isDigitsOnly(rawName)) {
+    ElMessage.warning('姓名不能为纯数字，请检查是否将学号填入了姓名栏')
+    return
+  }
   try {
-    await enrollStudent(selectedClassId.value, studentId.value.trim(), studentName.value.trim())
+    await enrollStudent(selectedClassId.value, rawId, rawName, studentMajor.value.trim())
     ElMessage.success('添加成功')
     enrollDialogVisible.value = false
     await loadStudents()
@@ -277,7 +298,7 @@ onMounted(async () => {
 
     <div v-if="!loading && students.length === 0" class="empty-state">该班级暂无学生</div>
 
-    <el-dialog v-model="enrollDialogVisible" title="手动添加学生" width="380px">
+    <el-dialog v-model="enrollDialogVisible" title="手动添加学生" width="420px">
       <div class="form-group">
         <label>学号</label>
         <el-input v-model="studentId" placeholder="输入学生学号" size="large" />
@@ -285,6 +306,10 @@ onMounted(async () => {
       <div class="form-group">
         <label>姓名</label>
         <el-input v-model="studentName" placeholder="输入学生姓名" size="large" />
+      </div>
+      <div class="form-group">
+        <label>专业</label>
+        <el-input v-model="studentMajor" placeholder="输入学生专业（选填）" size="large" />
       </div>
       <p class="hint">若该学号不存在，系统将自动创建学生账号。</p>
       <template #footer>

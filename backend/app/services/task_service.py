@@ -250,8 +250,9 @@ def task_overview(db: Session, teacher_id: str) -> dict:
     for uid, cid in enrollments:
         class_students.setdefault(cid, set()).add(uid)
 
-    total_completed = 0
-    total_incomplete = 0
+    # 按学生汇总：学生 → { 分配的任务ID集合, 完成的任务ID集合 }
+    student_assigned: dict[str, set[int]] = {}
+    student_completed: dict[str, set[int]] = {}
     tasks = []
 
     def _is_expired(end_time: datetime | None) -> bool:
@@ -268,8 +269,16 @@ def task_overview(db: Session, teacher_id: str) -> dict:
             student_ids.update(class_students.get(cid, set()))
         total = len(student_ids)
         completed = completion_counts.get(ann.id, 0)
-        total_completed += completed
-        total_incomplete += max(total - completed, 0)
+        # 按学生汇总：记录每个人被分配了哪些任务、完成了哪些
+        completed_set = set(
+            row.user_id for row in db.query(TaskCompletion.user_id)
+            .filter(TaskCompletion.announcement_id == ann.id, TaskCompletion.user_id.in_(student_ids))
+            .all()
+        ) if student_ids else set()
+        for sid in student_ids:
+            student_assigned.setdefault(sid, set()).add(ann.id)
+            if sid in completed_set:
+                student_completed.setdefault(sid, set()).add(ann.id)
         tasks.append({
             "id": ann.id,
             "title": ann.title,
@@ -279,6 +288,17 @@ def task_overview(db: Session, teacher_id: str) -> dict:
             "is_expired": _is_expired(ann.end_time),
             "created_at": _iso(ann.created_at),
         })
+
+    # 汇总：完成了所有分配任务的学生 = 已完成；至少一个未完成 = 未完成
+    total_completed = 0
+    total_incomplete = 0
+    for sid in student_assigned:
+        assigned = student_assigned.get(sid, set())
+        completed_set = student_completed.get(sid, set())
+        if assigned and assigned == completed_set:
+            total_completed += 1
+        else:
+            total_incomplete += 1
 
     return {
         "total_tasks": len(anns),

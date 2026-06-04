@@ -20,7 +20,6 @@ const questionKeyword = ref('')
 const questionTypeFilter = ref<'' | 'choice' | 'fill' | 'multi_choice'>('')
 const questionAddCount = ref<number | null>(null)
 const draftSelectedQuestionIds = ref<number[]>([])
-const checkedQuestionIds = ref<number[]>([])
 let questionRequestSeq = 0
 
 const form = reactive({
@@ -124,33 +123,13 @@ async function openQuestionPicker() {
   questionKeyword.value = ''
   questionTypeFilter.value = ''
   questionAddCount.value = null
-  checkedQuestionIds.value = []
   draftSelectedQuestionIds.value = [...form.question_ids]
   questionDialogVisible.value = true
   await loadQuestions()
 }
 
 function handleQuestionSelection(rows: Question[]) {
-  checkedQuestionIds.value = rows.map(item => item.id)
-}
-
-function appendQuestionIds(ids: number[]) {
-  const existing = new Set(draftSelectedQuestionIds.value)
-  const addedIds = ids.filter(id => !existing.has(id))
-  if (addedIds.length === 0) {
-    ElMessage.warning('当前没有可加入的新题目')
-    return
-  }
-  draftSelectedQuestionIds.value = [...draftSelectedQuestionIds.value, ...addedIds]
-  ElMessage.success(`已加入 ${addedIds.length} 道题`)
-}
-
-function addCheckedQuestions() {
-  if (checkedQuestionIds.value.length === 0) {
-    ElMessage.warning('请先勾选题目')
-    return
-  }
-  appendQuestionIds(checkedQuestionIds.value)
+  draftSelectedQuestionIds.value = rows.map(item => item.id)
 }
 
 function addTopFilteredQuestions() {
@@ -167,7 +146,9 @@ function addTopFilteredQuestions() {
     ElMessage.warning('当前筛选结果没有可加入的题目')
     return
   }
-  appendQuestionIds(availableIds.slice(0, count))
+  const addedIds = availableIds.slice(0, count)
+  draftSelectedQuestionIds.value = [...draftSelectedQuestionIds.value, ...addedIds]
+  ElMessage.success(`已加入 ${addedIds.length} 道题`)
 }
 
 function removeDraftQuestion(id: number) {
@@ -252,7 +233,6 @@ watch(() => form.course_id, () => {
   form.class_ids = []
   form.question_ids = []
   draftSelectedQuestionIds.value = []
-  checkedQuestionIds.value = []
   resetQuestionFilters()
   loadQuestions()
 })
@@ -378,7 +358,6 @@ onMounted(async () => {
               class="question-count-input"
             />
             <el-button plain type="primary" size="large" @click="addTopFilteredQuestions">加入前 N 题</el-button>
-            <el-button type="primary" size="large" @click="addCheckedQuestions">加入勾选题</el-button>
             <span class="question-result-count">筛选结果 {{ filteredQuestions.length }} 题</span>
           </div>
 

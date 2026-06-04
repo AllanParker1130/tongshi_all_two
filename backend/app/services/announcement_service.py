@@ -9,7 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
-from app.core.timezone_utils import to_beijing_iso
+from app.core.timezone_utils import to_beijing_iso, BEIJING_TZ
+from datetime import timezone as dt_timezone
 from app.models.entities import (
     Announcement,
     AnnouncementClass,
@@ -107,6 +108,16 @@ def create_announcement(db: Session, teacher_id: str, data: dict):
     if len(questions) != len(set(question_ids)):
         raise BusinessException(400, "题目必须属于所选课程")
 
+    # 前端传来的时间为北京时间 naive 字符串，转为 UTC 后再存储
+    def _to_utc(raw: datetime | str | None) -> datetime | None:
+        if raw is None:
+            return None
+        if isinstance(raw, str):
+            raw = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+        if raw.tzinfo is None:
+            raw = raw.replace(tzinfo=BEIJING_TZ)
+        return raw.astimezone(dt_timezone.utc).replace(tzinfo=None)
+
     ann = Announcement(
         course_id=course_id,
         teacher_id=teacher_id,
@@ -114,8 +125,8 @@ def create_announcement(db: Session, teacher_id: str, data: dict):
         title=data["title"],
         content="",
         question_ids=question_ids,
-        start_time=data.get("start_time"),
-        end_time=data.get("end_time"),
+        start_time=_to_utc(data.get("start_time")),
+        end_time=_to_utc(data.get("end_time")),
     )
     try:
         db.add(ann)

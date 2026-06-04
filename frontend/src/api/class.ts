@@ -25,6 +25,10 @@ export function createClass(data: { name: string; course_id: number }) {
   return http.post<any, ClassInfo>('/classes', data)
 }
 
+export function updateClass(id: number, data: { name?: string; course_id?: number }) {
+  return http.put<any, any>(`/classes/${id}`, data)
+}
+
 export function deleteClass(id: number) {
   return http.delete<any, any>(`/classes/${id}`)
 }
@@ -33,8 +37,8 @@ export function getClassStudents(classId: number) {
   return http.get<any, ClassStudent[]>(`/classes/${classId}/students`)
 }
 
-export function enrollStudent(classId: number, studentId: string, name: string = '') {
-  return http.post<any, any>(`/classes/${classId}/enroll`, { student_id: studentId, name })
+export function enrollStudent(classId: number, studentId: string, name: string = '', major: string = '') {
+  return http.post<any, any>(`/classes/${classId}/enroll`, { student_id: studentId, name, major })
 }
 
 export function unenrollStudent(classId: number, studentId: string) {

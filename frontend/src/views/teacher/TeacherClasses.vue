@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createClass, deleteClass, getClassStudents, getClasses, type ClassInfo, type ClassStudent } from '@/api/class'
+import { createClass, updateClass, deleteClass, getClassStudents, getClasses, type ClassInfo, type ClassStudent } from '@/api/class'
 import { getCourses, type Course } from '@/api/course'
 
 const router = useRouter()
@@ -12,6 +12,8 @@ const students = ref<ClassStudent[]>([])
 const loading = ref(true)
 const studentLoading = ref(false)
 const createDialogVisible = ref(false)
+const editDialogVisible = ref(false)
+const editingClassId = ref<number | null>(null)
 const studentDialogVisible = ref(false)
 const selectedClass = ref<ClassInfo | null>(null)
 
@@ -65,6 +67,32 @@ async function handleCreate() {
     await loadClasses()
   } catch {
     ElMessage.error('创建失败，请确认课程和班级名称')
+  }
+}
+
+function openEdit(row: ClassInfo) {
+  editingClassId.value = row.id
+  form.name = row.name
+  form.course_id = row.course_id || ''
+  editDialogVisible.value = true
+}
+
+async function handleEdit() {
+  if (!form.name.trim()) {
+    ElMessage.warning('请填写班级名称')
+    return
+  }
+  if (typeof editingClassId.value !== 'number') return
+  try {
+    await updateClass(editingClassId.value, {
+      name: form.name.trim(),
+      course_id: typeof form.course_id === 'number' ? form.course_id : undefined,
+    })
+    ElMessage.success('班级信息已更新')
+    editDialogVisible.value = false
+    await loadClasses()
+  } catch {
+    ElMessage.error('更新失败，请确认课程和班级名称')
   }
 }
 
@@ -137,8 +165,9 @@ onMounted(async () => {
           {{ row.created_at ? row.created_at.slice(0, 10) : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="320" fixed="right">
         <template #default="{ row }">
+          <el-button text size="small" @click="openEdit(row)">编辑</el-button>
           <el-button text size="small" @click="openStudents(row)">查看学生</el-button>
           <el-button text size="small" @click="openStudentAdmin(row)">学生管理</el-button>
           <el-button type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
@@ -162,6 +191,23 @@ onMounted(async () => {
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleCreate">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="editDialogVisible" title="编辑班级" width="420px">
+      <div class="form-group">
+        <label>所属课程</label>
+        <el-select v-model="form.course_id" placeholder="选择课程" size="large" clearable filterable style="width: 100%">
+          <el-option v-for="course in courses" :key="course.id" :label="course.name" :value="course.id" />
+        </el-select>
+      </div>
+      <div class="form-group">
+        <label>班级名称</label>
+        <el-input v-model="form.name" placeholder="如：26电信1-3" size="large" />
+      </div>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleEdit">保存</el-button>
       </template>
     </el-dialog>
 
