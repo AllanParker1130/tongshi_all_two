@@ -18,7 +18,12 @@ from app.core.security import require_role
 from app.core.response import success, paginated_success
 from app.core.exceptions import BusinessException
 from app.schemas.common import AuthUser, ProjectReviewAction, ResetRequestResolve
-from app.services.teacher_service import get_teacher_stats, list_students, list_all_projects
+from app.services.teacher_service import (
+    build_student_task_score_export,
+    get_teacher_stats,
+    list_all_projects,
+    list_students,
+)
 from app.services.project_service import approve_project, reject_project, delete_project, format_project
 from app.services.class_service import _delete_student_data
 from app.services.file_service import resolve_file_stream
@@ -41,13 +46,22 @@ def teacher_stats(db: Session = Depends(get_db), current_user: AuthUser = Depend
 @router.get("/students", summary="学生成绩", description="教师端：返回所有学生的学号、姓名、专业、班级、学习进度和练习统计")
 def get_students(
     class_id: int = None,
+    course_id: int = None,
     keyword: str = None,
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
     current_user: AuthUser = Depends(require_role("teacher")),
 ):
-    items, total = list_students(db, current_user.id, class_id, page, page_size, keyword)
+    items, total = list_students(
+        db,
+        current_user.id,
+        class_id=class_id,
+        page=page,
+        page_size=page_size,
+        keyword=keyword,
+        course_id=course_id,
+    )
     return paginated_success(items, total, page, page_size)
 
 
@@ -315,69 +329,128 @@ def _write_student_sheet(ws, students: list) -> None:
                   avg_incomplete, avg_rate])
 
 
+def _safe_sheet_title(name: str, used_titles: set[str]) -> str:
+    """生成 Excel 可用且不重复的工作表名称。"""
+    unsafe = set(r'[]:*?/\\')
+    base = "".join(c for c in str(name or "未命名") if c not in unsafe).strip() or "未命名"
+    base = base[:31]
+    title = base
+    index = 2
+    while title in used_titles:
+        suffix = f"_{index}"
+        title = f"{base[:31 - len(suffix)]}{suffix}"
+        index += 1
+    used_titles.add(title)
+    return title
+
+
+def _write_overview_sheet(ws, course_groups: list[dict]) -> None:
+    """写入按课程汇总的总览 Sheet。"""
+    ws.append(["课程名称", "学生人数", "作业数", "平均已完成", "平均未完成", "平均完成率(%)"])
+    for group in course_groups:
+        students = group.get("students", [])
+        count = len(students)
+        avg_completed = round(sum(s["completed_tasks"] for s in students) / count, 1) if count else 0
+        avg_incomplete = round(sum(s["incomplete_tasks"] for s in students) / count, 1) if count else 0
+        avg_rate = round(sum(s["task_completion_rate"] for s in students) / count, 1) if count else 0
+        ws.append([
+            group.get("course_name") or "未命名课程",
+            count,
+            len(group.get("tasks", [])),
+            avg_completed,
+            avg_incomplete,
+            avg_rate,
+        ])
+
+
+def _write_course_score_sheet(ws, group: dict) -> None:
+    """写入单个课程下学生每次作业分数。"""
+    tasks = group.get("tasks", [])
+    students = group.get("students", [])
+    base_headers = ["序号", "学号", "姓名", "专业", "班级", "已完成", "未完成", "完成率(%)"]
+    ws.append(base_headers + [task["title"] for task in tasks])
+
+    for idx, student in enumerate(students, start=1):
+        scores = student.get("scores", {})
+        ws.append([
+            student.get("serial_no") or idx,
+            student["id"],
+            student["name"],
+            student.get("major") or "",
+            student.get("class_name") or "未分班",
+            student["completed_tasks"],
+            student["incomplete_tasks"],
+            student["task_completion_rate"],
+            *[scores.get(task["id"]) for task in tasks],
+        ])
+
+    if students:
+        count = len(students)
+        summary = [
+            "平均",
+            "—",
+            "—",
+            "—",
+            "—",
+            round(sum(s["completed_tasks"] for s in students) / count, 1),
+            round(sum(s["incomplete_tasks"] for s in students) / count, 1),
+            round(sum(s["task_completion_rate"] for s in students) / count, 1),
+        ]
+        for task in tasks:
+            numeric_scores = [
+                student.get("scores", {}).get(task["id"])
+                for student in students
+                if student.get("scores", {}).get(task["id"]) is not None
+            ]
+            summary.append(round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else "")
+        ws.append(summary)
+
+
 @router.get("/students/export", summary="导出学生成绩", description="教师端：将学生成绩导出为 Excel 文件，支持按班级筛选")
 def export_students_excel(
     class_id: Optional[int] = None,
+    course_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: AuthUser = Depends(require_role("teacher")),
 ):
-    """导出学生成绩为 Excel。指定 class_id 时单 Sheet，否则全部班级多 Sheet"""
-    # 复用现有 service 获取学生成绩（不分页，全量导出）
-    students, _ = list_students(db, current_user.id, class_id=class_id)
+    """导出学生成绩为 Excel。按课程拆分 Sheet，并横向展示每次作业分数。"""
     today = date.today().strftime("%Y-%m-%d")
     wb = Workbook()
+    used_titles: set[str] = set()
+    course_groups = build_student_task_score_export(
+        db,
+        current_user.id,
+        course_id=course_id,
+        class_id=class_id,
+    )
 
-    if class_id is not None:
-        # 情况 A：指定班级——单 Sheet 导出
-        # 优先从学生成绩获取班级名，兜底查数据库
-        class_name = ""
-        if students:
-            class_name = students[0]["class_name"] or ""
-        if not class_name:
-            cls = db.query(Class).filter(Class.id == class_id).first()
-            class_name = cls.name if cls else f"班级{class_id}"
-
+    if course_id is not None or class_id is not None:
+        # 指定课程或班级时，导出最窄范围对应的课程成绩表。
+        group = course_groups[0] if course_groups else {
+            "course_name": "学生成绩",
+            "tasks": [],
+            "students": [],
+        }
         ws = wb.active
-        ws.title = class_name[:31]  # openpyxl 限制 Sheet 名最长 31 字符
-        _write_student_sheet(ws, students)
+        ws.title = _safe_sheet_title(group.get("course_name") or "学生成绩", used_titles)
+        _write_course_score_sheet(ws, group)
 
-        filename = f"学生成绩_{class_name}_{today}.xlsx"
+        scope_name = group.get("course_name") or "学生成绩"
+        if class_id is not None:
+            cls = db.query(Class).filter(Class.id == class_id).first()
+            if cls:
+                scope_name = cls.name
+        filename = f"学生成绩_{scope_name}_{today}.xlsx"
     else:
-        # 情况 B：全部学生——多 Sheet 导出
-        # Sheet 1：全部学生汇总
-        ws_all = wb.active
-        ws_all.title = "全部学生"
-        _write_student_sheet(ws_all, students)
+        # 全量导出时，先写总览，再按课程拆分 Sheet。
+        ws_overview = wb.active
+        ws_overview.title = _safe_sheet_title("总览", used_titles)
+        _write_overview_sheet(ws_overview, course_groups)
+        for group in course_groups:
+            ws_course = wb.create_sheet(title=_safe_sheet_title(group.get("course_name") or "未命名课程", used_titles))
+            _write_course_score_sheet(ws_course, group)
 
-        # 按班级分组，无班级归入"未分班"
-        class_groups: dict[str, list] = {}
-        for s in students:
-            cn = s["class_name"] or "未分班"
-            if cn not in class_groups:
-                class_groups[cn] = []
-            class_groups[cn].append(s)
-
-        # 每个班级一个 Sheet，同时收集摘要数据
-        summary_rows = []
-        for cn, group in class_groups.items():
-            ws_cls = wb.create_sheet(title=cn[:31])
-            _write_student_sheet(ws_cls, group)
-            count = len(group)
-            avg_c = round(sum(s["completed_tasks"]
-                          for s in group) / count, 1) if count else 0.0
-            avg_i = round(sum(s["incomplete_tasks"]
-                          for s in group) / count, 1) if count else 0.0
-            avg_r = round(sum(s["task_completion_rate"]
-                          for s in group) / count, 1) if count else 0.0
-            summary_rows.append([cn, count, avg_c, avg_i, avg_r])
-
-        # 最后一个 Sheet：数据摘要（各班级汇总）
-        ws_summary = wb.create_sheet(title="数据摘要")
-        ws_summary.append(["班级名称", "学生人数", "平均已完成", "平均未完成", "平均完成率(%)"])
-        for row in summary_rows:
-            ws_summary.append(row)
-
-        filename = f"学生成绩_全部班级_{today}.xlsx"
+        filename = f"学生成绩_全部课程_{today}.xlsx"
 
     # 将工作簿写入内存缓冲区，避免落盘
     buffer = io.BytesIO()

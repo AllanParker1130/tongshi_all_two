@@ -272,14 +272,15 @@ def _iso(dt: datetime | None) -> str:
     return dt.isoformat() if dt else ""
 
 
-def task_overview(db: Session, teacher_id: str) -> dict:
+def task_overview(db: Session, teacher_id: str, course_id: int | None = None) -> dict:
     """教师所有任务的总览：总完成数、未完成数，以及每个任务的简要信息。"""
-    anns = (
-        db.query(Announcement)
-        .filter(Announcement.teacher_id == teacher_id, Announcement.type == "quiz")
-        .order_by(Announcement.created_at.desc())
-        .all()
+    query = db.query(Announcement).filter(
+        Announcement.teacher_id == teacher_id,
+        Announcement.type == "quiz",
     )
+    if course_id is not None:
+        query = query.filter(Announcement.course_id == course_id)
+    anns = query.order_by(Announcement.created_at.desc()).all()
     if not anns:
         return {"total_tasks": 0, "total_completed": 0, "total_incomplete": 0, "tasks": []}
 
@@ -346,6 +347,8 @@ def task_overview(db: Session, teacher_id: str) -> dict:
         tasks.append({
             "id": ann.id,
             "title": ann.title,
+            "course_id": ann.course_id,
+            "course_name": ann.course.name if ann.course else "",
             "class_names": [class_names_map.get(cid, "") for cid in cids],
             "total_students": total,
             "completed_count": completed,

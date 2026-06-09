@@ -56,8 +56,12 @@ def get_unread_count(db: Session = Depends(get_db), current_user: AuthUser = Dep
 
 
 @router.get("/task-overview", summary="任务总览", description="教师端：返回所有任务的总体完成/未完成统计及每个任务的简要信息")
-def overview(db: Session = Depends(get_db), current_user: AuthUser = Depends(require_role("teacher"))):
-    return success(task_overview(db, current_user.id))
+def overview(
+    course_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: AuthUser = Depends(require_role("teacher")),
+):
+    return success(task_overview(db, current_user.id, course_id))
 
 
 @router.post("/{announcement_id}/read", summary="标记题目已读", description="学生端：将指定题目任务标记为已读（幂等）")

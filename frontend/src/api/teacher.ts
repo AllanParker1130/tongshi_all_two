@@ -31,10 +31,11 @@ export function getTeacherStats() {
   return http.get<any, TeacherStats>('/teacher/stats')
 }
 
-export function getStudents(classId?: number, page = 1, pageSize = 20, keyword?: string) {
+export function getStudents(classId?: number, page = 1, pageSize = 20, keyword?: string, courseId?: number) {
   const params: Record<string, any> = { page, page_size: pageSize }
   if (classId) params.class_id = classId
   if (keyword) params.keyword = keyword
+  if (courseId) params.course_id = courseId
   return http.get<any, PaginatedResult<Student>>('/teacher/students', { params })
 }
 

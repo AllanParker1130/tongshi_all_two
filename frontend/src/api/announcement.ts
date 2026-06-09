@@ -60,6 +60,8 @@ export interface TaskOverview {
   tasks: {
     id: number
     title: string
+    course_id: number
+    course_name: string
     class_names: string[]
     total_students: number
     completed_count: number
@@ -127,6 +129,7 @@ export function getCompletionReport(id: number, params?: {
   return http.get<any, CompletionReport>(`/announcements/${id}/completion-report`, { params })
 }
 
-export function getTaskOverview() {
-  return http.get<any, TaskOverview>('/announcements/task-overview')
+export function getTaskOverview(courseId?: number) {
+  const params = courseId ? { course_id: courseId } : undefined
+  return http.get<any, TaskOverview>('/announcements/task-overview', { params })
 }

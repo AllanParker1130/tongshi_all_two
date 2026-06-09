@@ -1,18 +1,33 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getStudents, type Student } from '@/api/teacher'
 import { getClasses, type ClassInfo } from '@/api/class'
 import { getTaskOverview, type TaskOverview } from '@/api/announcement'
+import { getCourses, type Course } from '@/api/course'
 import TeacherTaskDetail from './TeacherTaskDetail.vue'
 
 const students = ref<Student[]>([])
 const classes = ref<ClassInfo[]>([])
+const courses = ref<Course[]>([])
 const loading = ref(true)
+const selectedCourseId = ref<number | null>(null)
 const selectedClassId = ref<number | null>(null)
 const taskOverview = ref<TaskOverview | null>(null)
 const selectedTaskId = ref<number | null>(null)
 const drawerVisible = ref(false)
+const searchQuery = ref('')
+
+const filteredClasses = computed(() => {
+  if (!selectedCourseId.value) return classes.value
+  return classes.value.filter(cls => cls.course_id === selectedCourseId.value)
+})
+
+const exportButtonText = computed(() => {
+  if (selectedClassId.value) return '导出当前班级'
+  if (selectedCourseId.value) return '导出当前课程'
+  return '导出全部学生'
+})
 
 // 分页
 const currentPage = ref(1)
@@ -21,14 +36,16 @@ const total = ref(0)
 
 onMounted(async () => {
   try {
-    const [s, c, overview] = await Promise.all([
+    const [s, c, courseList, overview] = await Promise.all([
       getStudents(undefined, currentPage.value, pageSize.value),
       getClasses(),
+      getCourses(),
       getTaskOverview(),
     ])
     students.value = s.items
     total.value = s.total
     classes.value = c
+    courses.value = courseList
     taskOverview.value = overview
   } catch {
     ElMessage.error('学生成绩加载失败，请稍后重试')
@@ -42,8 +59,6 @@ function openTaskDetail(taskId: number) {
   drawerVisible.value = true
 }
 
-const searchQuery = ref('')
-
 async function loadStudents() {
   loading.value = true
   try {
@@ -51,7 +66,8 @@ async function loadStudents() {
       selectedClassId.value || undefined,
       currentPage.value,
       pageSize.value,
-      searchQuery.value.trim() || undefined
+      searchQuery.value.trim() || undefined,
+      selectedCourseId.value || undefined
     )
     students.value = res.items
     total.value = res.total
@@ -60,6 +76,25 @@ async function loadStudents() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadTaskOverview() {
+  try {
+    taskOverview.value = await getTaskOverview(selectedCourseId.value || undefined)
+  } catch {
+    ElMessage.error('作业列表加载失败，请稍后重试')
+  }
+}
+
+async function handleCourseChange() {
+  currentPage.value = 1
+  if (
+    selectedClassId.value &&
+    !filteredClasses.value.some(cls => cls.id === selectedClassId.value)
+  ) {
+    selectedClassId.value = null
+  }
+  await Promise.all([loadStudents(), loadTaskOverview()])
 }
 
 function handleClassChange() {
@@ -87,8 +122,11 @@ async function exportExcel() {
   try {
     // 从 localStorage 获取认证 token（与现有下载逻辑保持一致）
     const token = localStorage.getItem('auth_token')
-    const url = selectedClassId.value
-      ? `/api/teacher/students/export?class_id=${selectedClassId.value}`
+    const params = new URLSearchParams()
+    if (selectedClassId.value) params.set('class_id', String(selectedClassId.value))
+    if (selectedCourseId.value) params.set('course_id', String(selectedCourseId.value))
+    const url = params.toString()
+      ? `/api/teacher/students/export?${params.toString()}`
       : '/api/teacher/students/export'
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
@@ -144,7 +182,7 @@ async function exportExcel() {
           @click="openTaskDetail(task.id)"
         >
           <div class="task-card-header">
-            <span class="task-title">{{ task.title }}</span>
+            <span class="task-title">{{ task.title }}（{{ task.course_name || '未命名课程' }}）</span>
             <el-tag
               :type="task.is_expired ? 'warning' : 'success'"
               size="small"
@@ -164,6 +202,17 @@ async function exportExcel() {
 
     <div class="filter-bar">
         <el-select
+          v-model="selectedCourseId"
+          placeholder="全部课程"
+          clearable
+          filterable
+          size="default"
+          style="width: 220px"
+          @change="handleCourseChange"
+        >
+          <el-option v-for="course in courses" :key="course.id" :label="course.name" :value="course.id" />
+        </el-select>
+        <el-select
           v-model="selectedClassId"
           placeholder="全部班级"
           clearable
@@ -171,7 +220,7 @@ async function exportExcel() {
           style="width: 220px"
           @change="handleClassChange"
         >
-          <el-option v-for="cls in classes" :key="cls.id" :label="`${cls.course_name} · ${cls.name}`" :value="cls.id" />
+          <el-option v-for="cls in filteredClasses" :key="cls.id" :label="`${cls.course_name} · ${cls.name}`" :value="cls.id" />
         </el-select>
         <el-input
           v-model="searchQuery"
@@ -188,7 +237,7 @@ async function exportExcel() {
           :loading="exporting"
           style="margin-left: auto"
           @click="exportExcel"
-        >{{ selectedClassId ? '导出当前班级' : '导出全部学生' }}</el-button>
+        >{{ exportButtonText }}</el-button>
       </div>
 
       <el-table :data="students" stripe style="width: 100%" v-loading="loading">
