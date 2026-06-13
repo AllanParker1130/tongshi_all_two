@@ -11,6 +11,7 @@ const loading = ref(true)
 const filterCourse = ref<number | ''>('')
 const filterType = ref<'' | 'choice' | 'fill' | 'multi_choice'>('')
 const filterKeyword = ref('')
+const filterTag = ref('')
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -30,7 +31,14 @@ const form = reactive({
   options: ['', '', '', ''],
   answer: '',
   explanation: '',
+  tags: [] as string[],
 })
+
+function hasTag(row: Question, tag: string) {
+  const keyword = tag.trim().toLowerCase()
+  if (!keyword) return true
+  return (row.tags || []).some(item => item.toLowerCase().includes(keyword))
+}
 
 async function loadCourses() {
   const all = await getCourses()
@@ -48,8 +56,8 @@ async function loadQuestions() {
       page: page.value,
       page_size: pageSize.value,
     })
-    questions.value = result.items
-    total.value = result.total
+    questions.value = result.items.filter(item => hasTag(item, filterTag.value))
+    total.value = filterTag.value ? questions.value.length : result.total
   } catch {
     ElMessage.error('题目加载失败，请稍后重试')
   } finally {
@@ -61,6 +69,7 @@ function resetFilter() {
   filterCourse.value = ''
   filterType.value = ''
   filterKeyword.value = ''
+  filterTag.value = ''
   page.value = 1
   loadQuestions()
 }
@@ -79,6 +88,7 @@ function openNew() {
     options: ['', '', '', ''],
     answer: '',
     explanation: '',
+    tags: [],
   })
   dialogVisible.value = true
 }
@@ -92,6 +102,7 @@ function openEdit(row: Question) {
     options: row.options?.length ? [...row.options] : ['', '', '', ''],
     answer: row.answer,
     explanation: row.explanation,
+    tags: [...(row.tags || [])],
   })
   dialogVisible.value = true
 }
@@ -113,6 +124,7 @@ async function handleSave() {
     options: form.type === 'choice' || form.type === 'multi_choice' ? form.options.map(item => item.trim()).filter(Boolean) : [],
     answer: form.answer.trim(),
     explanation: form.explanation.trim(),
+    tags: form.tags.map(item => item.trim()).filter(Boolean),
   }
 
   try {
@@ -225,6 +237,7 @@ onMounted(async () => {
         <el-option label="多选题" value="multi_choice" />
         <el-option label="填空题" value="fill" />
       </el-select>
+      <el-input v-model="filterTag" placeholder="搜索标签" clearable style="width: 160px" @keyup.enter="page = 1; loadQuestions()" @clear="page = 1; loadQuestions()" />
       <el-button @click="resetFilter">重置</el-button>
       <span class="filter-count">共 {{ total }} 题</span>
     </div>
@@ -248,6 +261,14 @@ onMounted(async () => {
         </template>
       </el-table-column>
       <el-table-column prop="course_name" label="所属课程" min-width="160" />
+      <el-table-column label="课程标签" min-width="150">
+        <template #default="{ row }">
+          <div class="tag-list">
+            <el-tag v-for="tag in row.tags || []" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+            <span v-if="!row.tags?.length" class="readonly-text">-</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button v-if="!row.is_synced" text size="small" @click="openEdit(row)">编辑</el-button>
@@ -288,6 +309,19 @@ onMounted(async () => {
         </el-radio-group>
       </div>
       <div class="form-group">
+        <label>课程标签</label>
+        <el-select
+          v-model="form.tags"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          placeholder="输入标签后回车"
+          size="large"
+          style="width: 100%"
+        />
+      </div>
+      <div class="form-group">
         <label>题干</label>
         <el-input v-model="form.stem" type="textarea" :rows="3" placeholder="请输入题目内容" />
       </div>
@@ -317,15 +351,15 @@ onMounted(async () => {
         <p>请先选择模板类型并下载，再按模板填写后上传。</p>
         <table class="format-table">
           <thead>
-            <tr><th>题型</th><th>课程名称</th><th>题干</th><th>选项（选择题用 | 分隔）</th><th>答案</th><th>解析</th></tr>
+            <tr><th>题型</th><th>课程名称</th><th>标签</th><th>题干</th><th>选项（选择题用 | 分隔）</th><th>答案</th><th>解析</th></tr>
           </thead>
           <tbody>
-            <tr><td>choice</td><td>示例课程</td><td>图灵测试由谁提出？</td><td>A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦</td><td>A</td><td>图灵提出了图灵测试。</td></tr>
-            <tr><td>multi_choice</td><td>示例课程</td><td>以下哪些是编程语言？</td><td>A. Python|B. Java|C. HTML|D. C++</td><td>ABD</td><td>HTML 是标记语言，不是编程语言。</td></tr>
-            <tr><td>fill</td><td>示例课程</td><td>中国的首都是哪里？</td><td></td><td>北京</td><td>填空题直接填写答案关键词。</td></tr>
+            <tr><td>choice</td><td>示例课程</td><td>人工智能</td><td>图灵测试由谁提出？</td><td>A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦</td><td>A</td><td>图灵提出了图灵测试。</td></tr>
+            <tr><td>multi_choice</td><td>示例课程</td><td>编程基础|多选</td><td>以下哪些是编程语言？</td><td>A. Python|B. Java|C. HTML|D. C++</td><td>ABD</td><td>HTML 是标记语言，不是编程语言。</td></tr>
+            <tr><td>fill</td><td>示例课程</td><td>通识常识</td><td>中国的首都是哪里？</td><td></td><td>北京</td><td>填空题直接填写答案关键词。</td></tr>
           </tbody>
         </table>
-        <p class="import-note">请将"课程名称"填写为当前教师已有课程名称；"题型"支持 choice、multi_choice 和 fill。多选题答案列填写排序后的字母组合，如 ABD。</p>
+        <p class="import-note">请将"课程名称"填写为当前教师已有课程名称；"标签"支持用逗号、顿号或 | 分隔多个标签；"题型"支持 choice、multi_choice 和 fill。多选题答案列填写排序后的字母组合，如 ABD。</p>
       </div>
       <div class="import-actions">
         <div class="template-block">
@@ -439,6 +473,12 @@ onMounted(async () => {
 .readonly-text {
   color: var(--color-text-muted);
   font-size: 0.85rem;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .form-group {

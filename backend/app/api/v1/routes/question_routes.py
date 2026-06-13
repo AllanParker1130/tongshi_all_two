@@ -36,6 +36,7 @@ def _format_question(q):
         "options": q.options or [],
         "answer": q.answer,
         "explanation": q.explanation or "",
+        "tags": q.tags or [],
         "source_question_id": q.source_question_id,
         "is_synced": bool(q.source_question_id),
     }
@@ -149,17 +150,17 @@ def _build_question_template(question_type: str) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "题目导入模板"
-    ws.append(["题型", "课程名称", "题干", "选项（选择题用 | 分隔）", "答案", "解析"])
+    ws.append(["题型", "课程名称", "标签", "题干", "选项（选择题用 | 分隔）", "答案", "解析"])
     if question_type == "choice":
-        ws.append(["choice", "示例课程", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
+        ws.append(["choice", "示例课程", "人工智能基础", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
     elif question_type == "fill":
-        ws.append(["fill", "示例课程", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
+        ws.append(["fill", "示例课程", "通识常识", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
     elif question_type == "multi_choice":
-        ws.append(["multi_choice", "示例课程", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
+        ws.append(["multi_choice", "示例课程", "编程基础", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
     else:
-        ws.append(["choice", "示例课程", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
-        ws.append(["fill", "示例课程", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
-        ws.append(["multi_choice", "示例课程", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
+        ws.append(["choice", "示例课程", "人工智能基础", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
+        ws.append(["fill", "示例课程", "通识常识", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
+        ws.append(["multi_choice", "示例课程", "编程基础", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
     buffer = BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
