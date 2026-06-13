@@ -31,6 +31,8 @@ const announcementId = computed(() => {
   return id && Number.isFinite(id) ? id : null
 })
 const isAssignmentMode = computed(() => announcementId.value !== null)
+const enteredFromInbox = computed(() => route.name === 'practice-announcement')
+const assignmentBackText = computed(() => enteredFromInbox.value ? '返回消息' : '返回上一页')
 const randomCount = computed(() => {
   const raw = route.query.random as string | undefined
   return raw ? Number(raw) : null
@@ -274,6 +276,18 @@ function persistDraft() {
     updatedAt: Date.now(),
   })
 }
+
+function backToPrevious() {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+  if (isAssignmentMode.value) {
+    router.push(enteredFromInbox.value ? '/inbox' : '/practice/assignments')
+    return
+  }
+  router.push('/practice')
+}
 </script>
 
 <template>
@@ -281,11 +295,11 @@ function persistDraft() {
     <section class="quiz-hero">
       <div class="container">
         <div class="quiz-header">
-          <button class="back-btn" @click="router.push(isAssignmentMode ? '/inbox' : '/practice')">
+          <button class="back-btn" @click="backToPrevious">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M16 10H4m4-4l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            {{ isAssignmentMode ? '返回消息' : '退出练习' }}
+            {{ isAssignmentMode ? assignmentBackText : '退出练习' }}
           </button>
           <div class="quiz-info">
             <h2>{{ isAssignmentMode ? assignmentTitle || '任务练习' : '课程练习' }}</h2>
@@ -311,8 +325,8 @@ function persistDraft() {
           <h2>无法开始练习</h2>
           <p class="summary-text">{{ loadError }}</p>
           <div class="summary-actions">
-            <button class="btn-retry" @click="router.push(isAssignmentMode ? '/inbox' : '/practice')">
-              {{ isAssignmentMode ? '返回消息' : '返回练习列表' }}
+            <button class="btn-retry" @click="backToPrevious">
+              {{ isAssignmentMode ? assignmentBackText : '返回练习列表' }}
             </button>
           </div>
         </div>
@@ -325,8 +339,8 @@ function persistDraft() {
           <h2>暂无可练习题目</h2>
           <p class="summary-text">{{ isAssignmentMode ? '该任务暂未配置题目，请联系老师。' : '该课程暂未配置题目，请稍后再试。' }}</p>
           <div class="summary-actions">
-            <button class="btn-retry" @click="router.push(isAssignmentMode ? '/inbox' : '/practice')">
-              {{ isAssignmentMode ? '返回消息' : '返回练习列表' }}
+            <button class="btn-retry" @click="backToPrevious">
+              {{ isAssignmentMode ? assignmentBackText : '返回练习列表' }}
             </button>
           </div>
         </div>
@@ -349,8 +363,8 @@ function persistDraft() {
           </div>
           <p class="summary-text">正确率 {{ totalQuestions > 0 ? Math.round(correctCount / totalQuestions * 100) : 0 }}%</p>
           <div class="summary-actions">
-            <button class="btn-retry" @click="router.push(isAssignmentMode ? '/inbox' : '/practice')">
-              {{ isAssignmentMode ? '返回消息' : '返回练习列表' }}
+            <button class="btn-retry" @click="backToPrevious">
+              {{ isAssignmentMode ? assignmentBackText : '返回练习列表' }}
             </button>
           </div>
         </div>

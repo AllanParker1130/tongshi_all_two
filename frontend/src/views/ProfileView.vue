@@ -11,6 +11,13 @@ const authStore = useAuthStore()
 const router = useRouter()
 const activeTab = ref('password')
 
+const portfolioFeatures = [
+  { label: '学习时长', color: 'var(--color-learn)' },
+  { label: '练习正确率', color: 'var(--color-primary)' },
+  { label: '创意作品', color: 'var(--color-create)' },
+  { label: '公益参与', color: 'var(--color-act)' },
+]
+
 // 修改密码
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const pwdLoading = ref(false)
@@ -174,6 +181,25 @@ function handleTabChange(name: string) {
       <h1>个人中心</h1>
       <p class="subtitle">{{ authStore.user?.name }}，欢迎回来</p>
     </div>
+
+    <section class="portfolio-section">
+      <div class="portfolio-card">
+        <div class="portfolio-content">
+          <span class="section-kicker">成长沉淀</span>
+          <h3>查看我的成长档案</h3>
+          <p>公益课、读书会和落地项目中的参与记录，会和学习、练习、创作数据一起形成个人成长记录。</p>
+          <div class="portfolio-features">
+            <span v-for="feature in portfolioFeatures" :key="feature.label" class="pf-item">
+              <span class="pf-dot" :style="{ background: feature.color }"></span>
+              {{ feature.label }}
+            </span>
+          </div>
+        </div>
+        <el-button type="success" size="large" round @click="router.push('/portfolio')">
+          打开成长档案
+        </el-button>
+      </div>
+    </section>
 
     <el-tabs v-model="activeTab" type="border-card" @tab-change="handleTabChange">
       <!-- Tab 1：修改密码 -->
@@ -425,6 +451,67 @@ function handleTabChange(name: string) {
   margin: 0;
 }
 
+.portfolio-section {
+  margin-bottom: 24px;
+}
+
+.portfolio-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-2xl);
+  background: var(--color-act-bg);
+  border: 1px solid rgba(58, 125, 92, 0.12);
+  border-radius: var(--radius-md);
+}
+
+.section-kicker {
+  display: inline-block;
+  margin-bottom: var(--space-xs);
+  color: var(--color-act);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.portfolio-content h3 {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+  letter-spacing: 0.03em;
+}
+
+.portfolio-content p {
+  max-width: 640px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--space-md);
+}
+
+.portfolio-features {
+  display: flex;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.pf-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.pf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
 .tab-content {
   padding: 24px 8px;
   min-height: 300px;
@@ -554,6 +641,12 @@ function handleTabChange(name: string) {
 }
 
 @media (max-width: 768px) {
+  .portfolio-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-xl);
+  }
+
   .project-grid {
     grid-template-columns: repeat(2, 1fr);
   }

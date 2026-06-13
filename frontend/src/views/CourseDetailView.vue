@@ -38,7 +38,10 @@ onMounted(loadContents)
   <div class="course-detail-page">
     <section class="course-hero">
       <div class="container">
-        <button class="back-btn" @click="router.push('/learn')">返回课程列表</button>
+        <button class="back-btn" @click="router.push('/learn')">
+          <span class="back-arrow">←</span>
+          <span>返回课程列表</span>
+        </button>
         <div v-if="course" class="course-heading">
           <h1>{{ course.name }}</h1>
           <p>{{ course.material_count }} 份学习资料，{{ course.question_count }} 道练习题</p>
@@ -90,9 +93,27 @@ onMounted(loadContents)
 }
 
 .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: var(--space-lg);
+  padding: 8px 14px;
   color: var(--color-learn);
+  background: rgba(45, 106, 122, 0.08);
+  border: 1px solid rgba(45, 106, 122, 0.18);
+  border-radius: var(--radius-full);
   font-weight: 700;
+  transition: all var(--duration-fast);
+}
+
+.back-btn:hover {
+  background: rgba(45, 106, 122, 0.14);
+  transform: translateX(-2px);
+}
+
+.back-arrow {
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .course-heading h1 {
