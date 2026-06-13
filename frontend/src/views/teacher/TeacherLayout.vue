@@ -24,6 +24,9 @@ const navItems = [
 ]
 
 function isActive(path: string) {
+  if (path === '/teacher/task-report') {
+    return route.path.startsWith('/teacher/task-report')
+  }
   return route.path === path
 }
 

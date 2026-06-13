@@ -8,6 +8,13 @@ export interface TeacherStats {
   weekly_exercises: number
 }
 
+export interface StudentTaskScore {
+  announcement_id: number
+  title: string
+  score: number | null
+  is_completed: boolean
+}
+
 export interface Student {
   serial_no: number
   id: string
@@ -18,6 +25,7 @@ export interface Student {
   completed_tasks: number
   incomplete_tasks: number
   task_completion_rate: number
+  task_scores: StudentTaskScore[]
 }
 
 export interface PaginatedResult<T> {

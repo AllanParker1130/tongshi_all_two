@@ -98,6 +98,45 @@ def test_teacher_students_filters_stats_by_course(client, db_session, teacher_to
     assert second_resp["data"]["items"][0]["completed_tasks"] == 1
 
 
+def test_teacher_students_returns_each_task_scores(client, db_session, teacher_token):
+    first_course = db_session.query(Course).filter(Course.created_by == "T001", Course.name == "测试课程").one()
+    first_class = db_session.query(Class).filter(Class.course_id == first_course.id).one()
+    first_question = db_session.query(Question).filter(Question.course_id == first_course.id).one()
+    first_ann = _seed_assignment(db_session, first_course, first_class, "第一次作业", first_question)
+    second_ann = _seed_assignment(db_session, first_course, first_class, "第二次作业", first_question)
+    db_session.add_all([
+        QuizAttempt(
+            user_id="2025001",
+            question_id=first_question.id,
+            user_answer=first_question.answer,
+            is_correct=True,
+            announcement_id=first_ann.id,
+        ),
+        TaskCompletion(announcement_id=first_ann.id, user_id="2025001"),
+    ])
+    db_session.commit()
+
+    resp = client.get(
+        f"/api/teacher/students?course_id={first_course.id}",
+        headers=auth_header(teacher_token),
+    )
+    assert resp.status_code == 200
+    student = resp.json()["data"]["items"][0]
+    assert [item["title"] for item in student["task_scores"]] == ["第一次作业", "第二次作业"]
+    assert student["task_scores"][0] == {
+        "announcement_id": first_ann.id,
+        "title": "第一次作业",
+        "score": 100,
+        "is_completed": True,
+    }
+    assert student["task_scores"][1] == {
+        "announcement_id": second_ann.id,
+        "title": "第二次作业",
+        "score": None,
+        "is_completed": False,
+    }
+
+
 def test_students_export_splits_sheets_by_course_and_writes_task_scores(client, db_session, teacher_token):
     first_course = db_session.query(Course).filter(Course.created_by == "T001", Course.name == "测试课程").one()
     first_class = db_session.query(Class).filter(Class.course_id == first_course.id).one()
@@ -142,3 +181,14 @@ def test_students_export_splits_sheets_by_course_and_writes_task_scores(client, 
     second_headers = [cell.value for cell in second_sheet[1]]
     second_score_col = second_headers.index("第二课程作业") + 1
     assert second_sheet.cell(row=2, column=second_score_col).value == 0
+
+    filtered_resp = client.get(
+        f"/api/teacher/students/export?course_id={first_course.id}",
+        headers=auth_header(teacher_token),
+    )
+    assert filtered_resp.status_code == 200
+    filtered_wb = load_workbook(BytesIO(filtered_resp.content))
+    filtered_sheet = filtered_wb[filtered_wb.sheetnames[0]]
+    filtered_headers = [cell.value for cell in filtered_sheet[1]]
+    assert "第一课程作业" in filtered_headers
+    assert "第二课程作业" not in filtered_headers

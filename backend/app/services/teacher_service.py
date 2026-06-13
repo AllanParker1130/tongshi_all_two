@@ -148,24 +148,47 @@ def list_students(
         paged_ids = unique_student_ids
 
     # 任务与完成数据
+    # 获取教师相关课程 ID（与导出逻辑保持一致，按课程维度查任务）
+    course_id_query = db.query(Class.course_id).filter(Class.created_by == teacher_id).distinct()
+    if course_id:
+        course_id_query = course_id_query.filter(Class.course_id == course_id)
+    course_ids = [row.course_id for row in course_id_query.all()]
+
     class_task_ids: dict[int, set[int]] = {}
     completed_task_ids: dict[str, set[int]] = {sid: set() for sid in paged_ids}
+    task_by_id: dict[int, Announcement] = {}
+    task_scores: dict[tuple[str, int], int] = {}
+    task_titles: dict[int, str] = {}
+    ordered_tasks: list[Announcement] = []
 
-    if paged_ids:
+    if paged_ids and course_ids:
+        # 按课程维度查任务（与导出逻辑一致，不再限制 AnnouncementClass 关联）
         task_rows = (
-            db.query(Announcement.id, AnnouncementClass.class_id)
-            .join(AnnouncementClass, AnnouncementClass.announcement_id == Announcement.id)
+            db.query(Announcement)
             .filter(
                 Announcement.teacher_id == teacher_id,
                 Announcement.type == "quiz",
-                AnnouncementClass.class_id.in_(class_ids),
+                Announcement.course_id.in_(course_ids),
             )
+            .order_by(Announcement.created_at.asc(), Announcement.id.asc())
             .all()
         )
         all_task_ids: set[int] = set()
-        for task_id, owned_class_id in task_rows:
+        for task in task_rows:
+            task_by_id[task.id] = task
+            all_task_ids.add(task.id)
+
+        # 建立班级→任务映射：已关联到班级的任务按班级分组
+        task_class_rows = (
+            db.query(AnnouncementClass.announcement_id, AnnouncementClass.class_id)
+            .filter(
+                AnnouncementClass.announcement_id.in_(all_task_ids),
+                AnnouncementClass.class_id.in_(class_ids),
+            )
+            .all()
+        ) if all_task_ids else []
+        for task_id, owned_class_id in task_class_rows:
             class_task_ids.setdefault(owned_class_id, set()).add(task_id)
-            all_task_ids.add(task_id)
 
         if all_task_ids:
             completion_rows = (
@@ -178,6 +201,14 @@ def list_students(
             )
             for user_id, task_id in completion_rows:
                 completed_task_ids.setdefault(user_id, set()).add(task_id)
+
+            ordered_tasks = sorted(task_by_id.values(), key=lambda item: (item.created_at, item.id))
+            task_titles = _ordered_task_header_titles(ordered_tasks)
+            task_question_counts = {
+                task.id: len(task.question_ids if isinstance(task.question_ids, list) else [])
+                for task in ordered_tasks
+            }
+            task_scores = _latest_task_scores(db, list(all_task_ids), task_question_counts)
 
     result = []
     for sid in paged_ids:
@@ -193,6 +224,16 @@ def list_students(
         total_task_count = len(assigned_task_ids)
         incomplete_count = max(total_task_count - completed_count, 0)
         task_completion_rate = int(round(completed_count / total_task_count * 100)) if total_task_count else 0
+        score_items = []
+        for task in ordered_tasks:
+            if task.id not in assigned_task_ids:
+                continue
+            score_items.append({
+                "announcement_id": task.id,
+                "title": task_titles.get(task.id, task.title),
+                "score": task_scores.get((sid, task.id)),
+                "is_completed": task.id in completed_task_ids.get(sid, set()),
+            })
 
         result.append({
             "serial_no": enrollment.import_order or 0,
@@ -204,6 +245,7 @@ def list_students(
             "completed_tasks": completed_count,
             "incomplete_tasks": incomplete_count,
             "task_completion_rate": task_completion_rate,
+            "task_scores": score_items,
         })
     return result, total
 

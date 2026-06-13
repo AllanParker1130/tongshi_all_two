@@ -322,6 +322,13 @@ class ProjectReviewAction(BaseModel):
 
 
 # ── Teacher ─────────────────────────────────────────────────────────────────
+class StudentTaskScoreOut(BaseModel):
+    announcement_id: int
+    title: str
+    score: Optional[int] = None
+    is_completed: bool = False
+
+
 class StudentOut(BaseModel):
     serial_no: int = 0
     id: str
@@ -335,6 +342,7 @@ class StudentOut(BaseModel):
     completed_tasks: int = 0
     incomplete_tasks: int = 0
     task_completion_rate: int = 0
+    task_scores: List[StudentTaskScoreOut] = []
 
 
 class TeacherStatsOut(BaseModel):

@@ -3,9 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getStudents, type Student } from '@/api/teacher'
 import { getClasses, type ClassInfo } from '@/api/class'
-import { getTaskOverview, type TaskOverview } from '@/api/announcement'
 import { getCourses, type Course } from '@/api/course'
-import TeacherTaskDetail from './TeacherTaskDetail.vue'
 
 const students = ref<Student[]>([])
 const classes = ref<ClassInfo[]>([])
@@ -13,10 +11,9 @@ const courses = ref<Course[]>([])
 const loading = ref(true)
 const selectedCourseId = ref<number | null>(null)
 const selectedClassId = ref<number | null>(null)
-const taskOverview = ref<TaskOverview | null>(null)
-const selectedTaskId = ref<number | null>(null)
-const drawerVisible = ref(false)
 const searchQuery = ref('')
+const scoreDialogVisible = ref(false)
+const selectedScoreStudent = ref<Student | null>(null)
 
 const filteredClasses = computed(() => {
   if (!selectedCourseId.value) return classes.value
@@ -36,28 +33,21 @@ const total = ref(0)
 
 onMounted(async () => {
   try {
-    const [s, c, courseList, overview] = await Promise.all([
+    const [s, c, courseList] = await Promise.all([
       getStudents(undefined, currentPage.value, pageSize.value),
       getClasses(),
       getCourses(),
-      getTaskOverview(),
     ])
     students.value = s.items
     total.value = s.total
     classes.value = c
-    courses.value = courseList
-    taskOverview.value = overview
+    courses.value = courseList.filter(course => course.is_owner)
   } catch {
     ElMessage.error('学生成绩加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
 })
-
-function openTaskDetail(taskId: number) {
-  selectedTaskId.value = taskId
-  drawerVisible.value = true
-}
 
 async function loadStudents() {
   loading.value = true
@@ -78,14 +68,6 @@ async function loadStudents() {
   }
 }
 
-async function loadTaskOverview() {
-  try {
-    taskOverview.value = await getTaskOverview(selectedCourseId.value || undefined)
-  } catch {
-    ElMessage.error('作业列表加载失败，请稍后重试')
-  }
-}
-
 async function handleCourseChange() {
   currentPage.value = 1
   if (
@@ -94,7 +76,7 @@ async function handleCourseChange() {
   ) {
     selectedClassId.value = null
   }
-  await Promise.all([loadStudents(), loadTaskOverview()])
+  await loadStudents()
 }
 
 function handleClassChange() {
@@ -110,6 +92,24 @@ function handleSearch() {
 function handlePageChange(page: number) {
   currentPage.value = page
   loadStudents()
+}
+
+function visibleTaskScores(row: Student) {
+  return (row.task_scores || []).slice(0, 3)
+}
+
+function hasMoreTaskScores(row: Student) {
+  return (row.task_scores || []).length > 3
+}
+
+function formatTaskScore(score: number | null, isCompleted: boolean) {
+  if (score !== null && score !== undefined) return `${score}分`
+  return isCompleted ? '0分' : '未完成'
+}
+
+function openScoreDetail(row: Student) {
+  selectedScoreStudent.value = row
+  scoreDialogVisible.value = true
 }
 
 // 导出 loading 状态
@@ -153,51 +153,6 @@ async function exportExcel() {
   <div class="students-page">
     <div class="page-header">
       <h1>学生成绩</h1>
-    </div>
-
-    <!-- 任务概览卡片 -->
-    <div v-if="taskOverview && taskOverview.total_tasks > 0" class="overview-cards">
-      <div class="overview-card">
-        <span class="overview-num">{{ taskOverview.total_tasks }}</span>
-        <span class="overview-label">总任务数</span>
-      </div>
-      <div class="overview-card">
-        <span class="overview-num success">{{ taskOverview.total_completed }}</span>
-        <span class="overview-label">已完成</span>
-      </div>
-      <div class="overview-card">
-        <span class="overview-num warn">{{ taskOverview.total_incomplete }}</span>
-        <span class="overview-label">未完成</span>
-      </div>
-    </div>
-
-    <!-- 作业列表 -->
-    <div v-if="taskOverview && taskOverview.tasks.length > 0" class="task-list">
-      <h3 class="section-title">作业列表</h3>
-      <div class="task-cards">
-        <div
-          v-for="task in taskOverview.tasks"
-          :key="task.id"
-          class="task-card"
-          @click="openTaskDetail(task.id)"
-        >
-          <div class="task-card-header">
-            <span class="task-title">{{ task.title }}（{{ task.course_name || '未命名课程' }}）</span>
-            <el-tag
-              :type="task.is_expired ? 'warning' : 'success'"
-              size="small"
-            >
-              {{ task.is_expired ? '已截止' : '进行中' }}
-            </el-tag>
-          </div>
-          <div class="task-card-body">
-            <span class="task-classes">{{ task.class_names.join('、') }}</span>
-            <span class="task-progress">
-              完成 <strong>{{ task.completed_count }}</strong> / {{ task.total_students }}
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="filter-bar">
@@ -259,6 +214,29 @@ async function exportExcel() {
             </span>
           </template>
         </el-table-column>
+        <el-table-column label="作业成绩" min-width="260">
+          <template #default="{ row }">
+            <div v-if="row.task_scores?.length" class="task-score-list">
+              <el-tag
+                v-for="task in visibleTaskScores(row)"
+                :key="task.announcement_id"
+                size="small"
+                :type="task.is_completed ? 'success' : 'info'"
+              >
+                {{ task.title }}：{{ formatTaskScore(task.score, task.is_completed) }}
+              </el-tag>
+              <el-button
+                v-if="hasMoreTaskScores(row)"
+                text
+                size="small"
+                @click="openScoreDetail(row)"
+              >
+                详细
+              </el-button>
+            </div>
+            <span v-else class="muted-text">暂无作业</span>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div v-if="!loading && students.length === 0" class="empty-state">
@@ -276,8 +254,33 @@ async function exportExcel() {
         />
       </div>
 
-    <!-- 作业详情 Drawer -->
-    <TeacherTaskDetail v-model="drawerVisible" :announcement-id="selectedTaskId" />
+    <el-dialog
+      v-model="scoreDialogVisible"
+      :title="selectedScoreStudent ? `${selectedScoreStudent.name}的作业成绩` : '作业成绩'"
+      width="560px"
+    >
+      <el-table
+        v-if="selectedScoreStudent"
+        :data="selectedScoreStudent.task_scores || []"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column prop="title" label="作业名称" min-width="180" />
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.is_completed ? 'success' : 'info'" size="small">
+              {{ row.is_completed ? '已完成' : '未完成' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="成绩" width="100" align="center">
+          <template #default="{ row }">
+            {{ formatTaskScore(row.score, row.is_completed) }}
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -295,103 +298,6 @@ async function exportExcel() {
   color: var(--color-text);
   font-family: var(--font-serif);
   letter-spacing: 0.05em;
-}
-
-.overview-cards {
-  display: flex;
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
-}
-
-.overview-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: var(--space-lg) var(--space-md);
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.overview-num {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--color-primary);
-}
-
-.overview-num.success {
-  color: #10b981;
-}
-
-.overview-num.warn {
-  color: #ef4444;
-}
-
-.overview-label {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  margin-top: var(--space-xs);
-}
-
-.section-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--space-md);
-  padding-left: var(--space-sm);
-  border-left: 3px solid var(--color-primary);
-}
-
-.task-list {
-  margin-bottom: var(--space-xl);
-}
-
-.task-cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.task-card {
-  padding: var(--space-md) var(--space-lg);
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--duration-fast);
-}
-
-.task-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-.task-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-xs);
-}
-
-.task-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.task-card-body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-.task-progress strong {
-  color: var(--color-primary);
-  font-weight: 700;
 }
 
 .filter-bar {
@@ -423,5 +329,17 @@ async function exportExcel() {
   display: flex;
   justify-content: center;
   margin-top: var(--space-xl);
+}
+
+.task-score-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.muted-text {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
 }
 </style>
