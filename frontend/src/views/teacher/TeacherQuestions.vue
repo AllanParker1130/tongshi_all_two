@@ -23,6 +23,7 @@ const importFile = ref<File | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
 const importErrors = ref<{ row: number; reason: string }[]>([])
+const importSkips = ref<{ row: number; reason: string }[]>([])
 const importErrorDialogVisible = ref(false)
 const selectedQuestionIds = ref<number[]>([])
 const importFailureReason = ref('')
@@ -237,11 +238,17 @@ async function handleImport() {
   importing.value = true
   importFailureReason.value = ''
   importErrors.value = []
+  importSkips.value = []
   try {
     const result = await importQuestions(importFile.value)
-    ElMessage.success(`导入完成：成功 ${result.success_count} 题，失败 ${result.fail_count} 题`)
-    if (result.errors && result.errors.length > 0) {
-      importErrors.value = result.errors
+    // 构建成功提示
+    const parts = [`成功 ${result.success_count} 题`]
+    if (result.skip_count > 0) parts.push(`跳过 ${result.skip_count} 题（已存在）`)
+    if (result.fail_count > 0) parts.push(`失败 ${result.fail_count} 题`)
+    ElMessage.success(`导入完成：${parts.join('，')}`)
+    importErrors.value = result.errors || []
+    importSkips.value = result.skips || []
+    if (importErrors.value.length > 0 || importSkips.value.length > 0) {
       importErrorDialogVisible.value = true
     } else {
       importErrorDialogVisible.value = false
@@ -433,15 +440,29 @@ onMounted(async () => {
       </template>
     </el-dialog>
 
-    <!-- 导入失败详情弹窗 -->
-    <el-dialog v-model="importErrorDialogVisible" title="导入失败详情" width="560px">
+    <!-- 导入结果详情弹窗 -->
+    <el-dialog v-model="importErrorDialogVisible" title="导入结果详情" width="560px">
       <div v-if="importFailureReason" class="import-failure-reason">
         {{ importFailureReason }}
       </div>
-      <el-table v-else :data="importErrors" stripe max-height="400">
-        <el-table-column prop="row" label="行号" width="80" />
-        <el-table-column prop="reason" label="失败原因" />
-      </el-table>
+      <template v-else>
+        <!-- 跳过的题目 -->
+        <template v-if="importSkips.length > 0">
+          <h4 style="margin: 0 0 8px; color: #e6a23c;">以下题目已存在，已跳过（{{ importSkips.length }} 题）</h4>
+          <el-table :data="importSkips" stripe max-height="200">
+            <el-table-column prop="row" label="行号" width="80" />
+            <el-table-column prop="reason" label="跳过原因" />
+          </el-table>
+        </template>
+        <!-- 导入失败的题目 -->
+        <template v-if="importErrors.length > 0">
+          <h4 :style="{ margin: importSkips.length > 0 ? '16px 0 8px' : '0 0 8px', color: '#f56c6c' }">以下题目导入失败（{{ importErrors.length }} 题）</h4>
+          <el-table :data="importErrors" stripe max-height="200">
+            <el-table-column prop="row" label="行号" width="80" />
+            <el-table-column prop="reason" label="失败原因" />
+          </el-table>
+        </template>
+      </template>
       <template #footer>
         <el-button @click="importErrorDialogVisible = false">关闭</el-button>
       </template>

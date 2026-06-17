@@ -61,7 +61,7 @@ export function batchDeleteQuestions(questionIds: number[]) {
 export function importQuestions(file: File) {
   const formData = new FormData()
   formData.append('file', file)
-  return http.post<any, { success_count: number; fail_count: number; errors: { row: number; reason: string }[] }>('/questions/import', formData, {
+  return http.post<any, { success_count: number; fail_count: number; skip_count: number; errors: { row: number; reason: string }[]; skips: { row: number; reason: string }[] }>('/questions/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }

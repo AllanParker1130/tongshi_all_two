@@ -1,0 +1,103 @@
+"""题库导入重复检测测试。"""
+import io
+
+import openpyxl
+from app.services.question_service import import_questions_from_excel
+
+
+def _make_excel_rows(rows: list[dict]) -> list[dict]:
+    """将列表形式转为 import_questions_from_excel 需要的 dict 列表。"""
+    return rows
+
+
+def _build_import_excel(headers: list[str], data_rows: list[list[str]]) -> bytes:
+    """构建一个 Excel 文件，返回 bytes。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(headers)
+    for row in data_rows:
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestImportDuplicateDetection:
+    """验证题库导入时重复题干被跳过而非报错。"""
+
+    def test_duplicate_stem_is_skipped(self, db_session):
+        """相同课程、相同题干的题目再次导入时应跳过，而非重复插入。"""
+        # 种子数据已有：course_id=1, stem="1+1=?"
+        rows = [
+            {"题型": "choice", "课程名称": "测试课程", "题干": "1+1=?",
+             "选项": "A. 1|B. 2|C. 3|D. 4", "答案": "B", "解析": "基础加法"},
+        ]
+        result = import_questions_from_excel(db_session, rows, "T001")
+        assert result["success_count"] == 0
+        assert result["skip_count"] == 1
+        assert result["fail_count"] == 0
+        assert len(result["skips"]) == 1
+        assert "已存在相同题目" in result["skips"][0]["reason"]
+
+    def test_new_stem_is_imported(self, db_session):
+        """不同题干的题目应正常导入。"""
+        rows = [
+            {"题型": "fill", "课程名称": "测试课程", "题干": "太阳从哪边升起？",
+             "选项": "", "答案": "东方", "解析": "地理常识"},
+        ]
+        result = import_questions_from_excel(db_session, rows, "T001")
+        assert result["success_count"] == 1
+        assert result["skip_count"] == 0
+        assert result["fail_count"] == 0
+        assert len(result["skips"]) == 0
+
+    def test_mixed_new_and_duplicate(self, db_session):
+        """混合导入：新题目成功，重复题目跳过。"""
+        rows = [
+            {"题型": "choice", "课程名称": "测试课程", "题干": "1+1=?",
+             "选项": "A. 1|B. 2|C. 3|D. 4", "答案": "B", "解析": ""},
+            {"题型": "fill", "课程名称": "测试课程", "题干": "水的化学式？",
+             "选项": "", "答案": "H2O", "解析": ""},
+            {"题型": "fill", "课程名称": "测试课程", "题干": "光速约多少？",
+             "选项": "", "答案": "3×10^8 m/s", "解析": ""},
+        ]
+        result = import_questions_from_excel(db_session, rows, "T001")
+        assert result["success_count"] == 2
+        assert result["skip_count"] == 1
+        assert result["fail_count"] == 0
+        assert len(result["skips"]) == 1
+        assert "1+1=?" in result["skips"][0]["reason"]
+
+    def test_same_stem_different_course_not_skipped(self, db_session):
+        """不同课程下的相同题干不应被跳过（不同课程允许相同题目）。"""
+        rows = [
+            {"题型": "choice", "课程名称": "其它课程", "题干": "1+1=?",
+             "选项": "A. 1|B. 2|C. 3|D. 4", "答案": "B", "解析": ""},
+        ]
+        result = import_questions_from_excel(db_session, rows, "T002")
+        assert result["success_count"] == 1
+        assert result["skip_count"] == 0
+
+    def test_import_via_api_skips_duplicates(self, client, teacher_token):
+        """通过 API 上传 Excel，重复题目应返回 skip_count。"""
+        from tests.conftest import auth_header
+
+        excel_bytes = _build_import_excel(
+            ["题型", "课程名称", "题干", "选项", "答案", "解析"],
+            [
+                ["choice", "测试课程", "1+1=?", "A. 1|B. 2|C. 3|D. 4", "B", "基础加法"],
+                ["fill", "测试课程", "地球的自转周期？", "", "约24小时", ""],
+            ],
+        )
+        resp = client.post(
+            "/api/questions/import",
+            headers=auth_header(teacher_token),
+            files={"file": ("test.xlsx", excel_bytes,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        data = resp.json()
+        assert data["code"] == 0
+        assert data["data"]["success_count"] == 1
+        assert data["data"]["skip_count"] == 1
+        assert data["data"]["fail_count"] == 0
+        assert len(data["data"]["skips"]) == 1

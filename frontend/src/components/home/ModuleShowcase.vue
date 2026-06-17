@@ -1,177 +1,86 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const activeModule = ref(-1)
 
 const modules = [
   {
     key: 'learn',
-    icon: '📚',
-    tagline: '积累知识',
-    title: '学·积累知识',
-    subtitle: '系统学习，循序渐进',
-    desc: '系统学习 AI 通识课程，从概念到工具，循序渐进掌握人工智能基础知识体系。',
-    features: [
-      { icon: '&#9678;', text: '核心课程模块，系统构建 AI 知识图谱' },
-      { icon: '&#9670;', text: '视频+图文配合，多层次学习体验' },
-      { icon: '&#9679;', text: '随时复习，断点续播学习进度' },
-    ],
-    gradient: 'var(--gradient-card-learn)',
-    color: 'var(--color-learn)',
-    colorLight: 'var(--color-learn-light)',
+    mark: '学',
+    title: '课程学习',
+    desc: '查看当前可学习课程与资料，按教学节奏继续推进。',
+    status: '进入学习页查看最新课程',
+    actions: ['查看课程资料', '继续当前学习'],
     route: '/learn',
+    color: 'var(--color-learn)',
   },
   {
     key: 'practice',
-    icon: '🧠',
-    tagline: '深化理解',
-    title: '思·深化理解',
-    subtitle: '在线题库，检验成果',
-    desc: '通过在线题库和专项练习，检验学习成果，反思知识盲点，强化对AI核心概念的理解。',
-    features: [
-      { icon: '&#9632;', text: '100+题目，覆盖课程核心知识点' },
-      { icon: '&#9670;', text: '即时反馈，错题自动归类' },
-      { icon: '&#9679;', text: '错题回顾，精准查漏补缺' },
-    ],
-    gradient: 'var(--gradient-card-practice)',
-    color: 'var(--color-practice)',
-    colorLight: 'var(--color-practice-light)',
+    mark: '思',
+    title: '练习反思',
+    desc: '通过在线练习和错题回看，确认自己是否真正理解。',
+    status: '练习、错题和任务集中处理',
+    actions: ['进入题库练习', '回看错题记录'],
     route: '/practice',
+    color: 'var(--color-practice)',
   },
   {
     key: 'create',
-    icon: '🛠️',
-    tagline: '动手创作',
-    title: '践·动手创作',
-    subtitle: '将所学付诸实践',
-    desc: '将所学付诸实践，运用AI工具完成创意项目，展示个人作品，在动手中将知识内化为能力。',
-    features: [
-      { icon: '&#9733;', text: '项目实践，AI工具应用实战' },
-      { icon: '&#9670;', text: '作品展示，瀑布流沉浸式浏览' },
-      { icon: '&#9679;', text: 'AI工具应用，虚实交融创造体验' },
-    ],
-    gradient: 'var(--gradient-card-create)',
-    color: 'var(--color-create)',
-    colorLight: 'var(--color-create-light)',
+    mark: '践',
+    title: '实践创作',
+    desc: '浏览作品、提交成果，把 AI 工具使用转化为作品表达。',
+    status: '作品提交与展示从这里进入',
+    actions: ['浏览学生作品', '提交实践成果'],
     route: '/create',
+    color: 'var(--color-create)',
   },
   {
     key: 'act',
-    icon: '🌱',
-    tagline: '感悟价值',
-    title: '悟·感悟价值',
-    subtitle: '公益行动，感悟意义',
-    desc: '参与AI公益课程与社区行动，思考技术的社会价值与伦理责任，在服务中感悟AI对人类的意义。',
-    features: [
-      { icon: '&#9830;', text: '公益行动，走进社区与中小学' },
-      { icon: '&#9670;', text: '社会价值，思考AI伦理与责任' },
-      { icon: '&#9679;', text: '成长档案，能力可视化留存' },
-    ],
-    gradient: 'var(--gradient-card-act)',
-    color: 'var(--color-act)',
-    colorLight: 'var(--color-act-light)',
+    mark: '悟',
+    title: '行动感悟',
+    desc: '查看公益课、读书会和社区行动，理解技术的社会价值。',
+    status: '行动记录支持二级详情查看',
+    actions: ['阅读行动案例', '查看公益图文'],
     route: '/act',
+    color: 'var(--color-act)',
   },
 ]
-
-let timer: ReturnType<typeof setInterval> | undefined
-let idleTimeout: ReturnType<typeof setTimeout> | undefined
-
-const startTimer = () => {
-  if (timer) clearInterval(timer)
-  timer = setInterval(() => {
-    activeModule.value = (activeModule.value + 1) % modules.length
-  }, 6000)
-}
-
-const stopTimer = () => {
-  if (timer) {
-    clearInterval(timer)
-    timer = undefined
-  }
-}
-
-const cancelIdle = () => {
-  if (idleTimeout) {
-    clearTimeout(idleTimeout)
-    idleTimeout = undefined
-  }
-}
-
-const scheduleIdle = () => {
-  cancelIdle()
-  idleTimeout = setTimeout(() => {
-    startTimer()
-  }, 8000)
-}
-
-onMounted(() => {
-  scheduleIdle()
-})
-
-onUnmounted(() => {
-  stopTimer()
-  cancelIdle()
-})
 </script>
 
 <template>
   <section class="module-showcase">
     <div class="container">
-      <!-- Section header -->
       <div class="section-header fade-up">
-        <span class="section-tag">核心模块</span>
-        <h2 class="section-title">学 · 思 · 践 · 悟 四维并进</h2>
+        <span class="section-tag">四个入口</span>
+        <h2 class="section-title">按任务选择，不按介绍停留</h2>
         <p class="section-desc">
-          从知识学习到深化反思，从实践创作到感悟价值<br />
-          构建完整的 AI 通识成长闭环
+          首页只保留学生最常用的四条路径。课程内容以学习页真实数据为准，不再在首页写死旧模块。
         </p>
       </div>
 
-      <!-- Module cards -->
       <div class="modules-grid">
-        <div
+        <button
           v-for="(mod, index) in modules"
           :key="mod.key"
           class="module-card fade-up"
-          :class="{ active: activeModule === index }"
-          :style="{ '--card-gradient': mod.gradient, '--card-color': mod.color, '--card-color-light': mod.colorLight }"
-          :data-fade-delay="`${index * 0.1}s`"
-          @mouseenter="() => { activeModule = index; stopTimer(); cancelIdle(); }"
-          @mouseleave="() => { activeModule = -1; scheduleIdle(); }"
+          type="button"
+          :style="{ '--card-color': mod.color }"
+          :data-fade-delay="`${index * 0.08}s`"
           @click="router.push(mod.route)"
         >
-          <div class="card-header">
-            <div class="card-icon">{{ mod.icon }}</div>
-            <span class="card-tagline">{{ mod.tagline }}</span>
-          </div>
-
-          <h3 class="card-title">{{ mod.title }}</h3>
-          <p class="card-subtitle">{{ mod.subtitle }}</p>
-          <p class="card-desc">{{ mod.desc }}</p>
-
-          <ul class="card-features">
-            <li v-for="feat in mod.features" :key="feat.text">
-              <span class="feature-check" v-html="feat.icon"></span>
-              {{ feat.text }}
-            </li>
-          </ul>
-
-          <div class="card-footer">
-            <span class="card-link">
-              进入模块
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                <path d="M4 10h12m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+          <span class="module-mark">{{ mod.mark }}</span>
+          <span class="module-main">
+            <span class="module-topline">
+              <strong>{{ mod.title }}</strong>
+              <span>进入</span>
             </span>
-          </div>
-
-          <!-- Glow effect -->
-          <div class="card-glow"></div>
-        </div>
+            <span class="module-desc">{{ mod.desc }}</span>
+            <span class="module-actions">
+              <span v-for="action in mod.actions" :key="action">{{ action }}</span>
+            </span>
+            <span class="module-status">{{ mod.status }}</span>
+          </span>
+        </button>
       </div>
     </div>
   </section>
@@ -179,214 +88,159 @@ onUnmounted(() => {
 
 <style scoped>
 .module-showcase {
-  padding: var(--space-4xl) 0;
+  padding: var(--space-3xl) 0;
   background: var(--color-bg);
 }
 
-/* Section header */
 .section-header {
-  text-align: center;
-  margin-bottom: var(--space-4xl);
+  max-width: 680px;
+  margin-bottom: var(--space-2xl);
 }
 
 .section-tag {
   display: inline-block;
-  padding: 0.25rem 0.8rem;
-  font-size: 0.72rem;
-  font-weight: 600;
+  padding: 0.25rem 0.72rem;
   color: var(--color-primary);
   background: var(--color-primary-glow);
   border-radius: var(--radius-sm);
-  letter-spacing: 0.1em;
-  margin-bottom: var(--space-lg);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-md);
 }
 
 .section-title {
-  font-family: var(--font-serif);
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
-  font-weight: 900;
+  margin-bottom: var(--space-sm);
   color: var(--color-text);
-  margin-bottom: var(--space-md);
-  letter-spacing: 0.05em;
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
 }
 
 .section-desc {
-  font-size: 1rem;
+  max-width: 620px;
   color: var(--color-text-secondary);
-  line-height: 1.8;
+  font-size: 0.95rem;
+  line-height: 1.75;
 }
 
-/* Module grid */
 .modules-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-xl);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
 }
 
-/* Module card */
 .module-card {
-  position: relative;
-  padding: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  padding: var(--space-lg);
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--ease-out);
-  overflow: hidden;
+  text-align: left;
+  transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), border-color 150ms var(--ease-out);
 }
 
-.module-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--card-color);
-  opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-out);
+.module-card:hover {
+  border-color: var(--card-color);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
-.module-card:hover,
-.module-card.active {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: transparent;
+.module-card:active {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-sm);
 }
 
-.module-card:hover::before,
-.module-card.active::before {
-  opacity: 1;
-}
-
-.card-glow {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--card-gradient);
-  opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-out);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.module-card:hover .card-glow,
-.module-card.active .card-glow {
-  opacity: 0.4;
-}
-
-.module-card > *:not(.card-glow) {
-  position: relative;
-  z-index: 1;
-}
-
-/* Card content */
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.card-icon {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: white;
-  background: var(--card-color);
-  border-radius: var(--radius-md);
-  transition: transform var(--duration-normal) var(--ease-spring);
-}
-
-.module-card:hover .card-icon {
-  transform: scale(1.08) rotate(-3deg);
-}
-
-.card-tagline {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--card-color);
-  letter-spacing: 0.06em;
-}
-
-.card-title {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: var(--color-text);
-  margin-bottom: var(--space-xs);
-}
-
-.card-subtitle {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  font-weight: 500;
-  margin-bottom: var(--space-lg);
-}
-
-.card-desc {
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-  line-height: 1.7;
-  margin-bottom: var(--space-xl);
-}
-
-/* Features */
-.card-features {
-  margin-bottom: var(--space-xl);
-}
-
-.card-features li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-sm) 0;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.feature-check {
-  color: var(--card-color);
-  font-size: 0.7rem;
-  margin-top: 3px;
-  flex-shrink: 0;
-}
-
-/* Footer */
-.card-footer {
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--color-border-light);
-}
-
-.card-link {
+.module-mark {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  font-size: 0.85rem;
-  font-weight: 600;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: var(--space-lg);
+  color: var(--color-bg-card);
+  background: var(--card-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-serif);
+  font-weight: 900;
+}
+
+.module-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.module-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.module-topline strong {
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.module-topline span {
   color: var(--card-color);
-  transition: all var(--duration-fast);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.card-link svg {
-  transition: transform var(--duration-fast) var(--ease-out);
+.module-desc {
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.7;
 }
 
-.module-card:hover .card-link svg {
-  transform: translateX(4px);
+.module-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.module-actions span {
+  padding: 0.22rem 0.5rem;
+  color: var(--card-color);
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.module-status {
+  margin-top: auto;
+  padding-top: var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 1024px) {
   .modules-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .module-showcase {
+    padding: var(--space-2xl) 0;
+  }
+
+  .modules-grid {
     grid-template-columns: 1fr;
-    max-width: 560px;
-    margin: 0 auto;
+  }
+
+  .module-card {
+    min-height: auto;
   }
 }
 </style>

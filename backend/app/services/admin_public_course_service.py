@@ -1,12 +1,13 @@
 """管理员公共课程服务。"""
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
-from app.models.entities import Course, Material, Question
+from app.models.entities import Course, Material, Question, QuizAttempt
 from app.services.public_course_sync_service import (
     delete_synced_materials,
     delete_synced_questions,
@@ -87,6 +88,11 @@ def delete_public_course(db: Session, course_id: int) -> bool:
             Material.source_material_id.in_(source_material_ids),
         ).update({Material.source_material_id: None}, synchronize_session=False)
     if source_question_ids:
+        # 先清理引用这些题目的 QuizAttempt，防止外键约束阻止题目删除
+        # （即使模型已声明 ondelete=CASCADE，旧数据库可能尚未执行迁移）
+        db.query(QuizAttempt).filter(
+            QuizAttempt.question_id.in_(source_question_ids),
+        ).delete(synchronize_session=False)
         db.query(Question).filter(
             Question.source_question_id.in_(source_question_ids),
         ).update({Question.source_question_id: None}, synchronize_session=False)
@@ -211,3 +217,71 @@ def delete_public_question(db: Session, question_id: int) -> bool:
     db.delete(question)
     db.commit()
     return True
+
+
+def get_course_by_id(db: Session, course_id: int) -> Course | None:
+    """按 ID 查询课程（不限公共标记）。"""
+    return db.query(Course).filter(Course.id == course_id).first()
+
+
+def _row_value(row: dict, *keys: str):
+    for key in keys:
+        value = row.get(key)
+        if value is not None and str(value).strip() != "":
+            return value
+    return ""
+
+
+def _normalize_tags(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = re.split(r"[,，、|/；;]+", str(value))
+    seen = set()
+    tags = []
+    for item in raw_items:
+        tag = str(item).strip()
+        if tag and tag not in seen:
+            seen.add(tag)
+            tags.append(tag)
+    return tags
+
+
+def import_questions_to_public_course(db: Session, course_id: int, rows: list[dict]) -> dict:
+    """批量导入题目到公共课程，并同步到教师副本。"""
+    course = _get_public_course(db, course_id)
+    if not course:
+        raise BusinessException(404, "公共课程不存在")
+    success_count = 0
+    fail_count = 0
+    errors = []
+    for idx, row in enumerate(rows, start=2):
+        try:
+            q_type = str(_row_value(row, "题型", "type")).strip()
+            stem = str(_row_value(row, "题干", "stem")).strip()
+            if not stem:
+                raise BusinessException(400, "题干为空")
+            options = str(_row_value(row, "选项（选择题用 | 分隔）", "选项", "options")).strip()
+            option_list = [x.strip() for x in options.split("|") if x.strip()] if options else []
+            answer = str(_row_value(row, "答案", "answer")).strip()
+            explanation = str(_row_value(row, "解析", "explanation")).strip()
+            tags = _normalize_tags(_row_value(row, "标签", "课程标签", "tags", "course_tags"))
+            if q_type not in {"choice", "fill", "multi_choice"}:
+                raise BusinessException(400, "题型必须为 choice、fill 或 multi_choice")
+            if q_type in {"choice", "multi_choice"} and not option_list:
+                raise BusinessException(400, "选择题必须填写选项")
+            question = Question(
+                type=q_type, course_id=course.id, stem=stem,
+                options=option_list, answer=answer, explanation=explanation, tags=tags,
+            )
+            db.add(question)
+            db.flush()
+            sync_question_to_course_copies(db, question)
+            success_count += 1
+        except Exception as exc:
+            fail_count += 1
+            errors.append({"row": idx, "reason": str(exc)})
+    db.commit()
+    return {"success_count": success_count, "fail_count": fail_count, "errors": errors}

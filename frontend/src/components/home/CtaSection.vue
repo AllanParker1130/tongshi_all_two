@@ -15,41 +15,17 @@ const router = useRouter()
         </div>
 
         <div class="cta-content">
-          <h2 class="cta-title">
-            在学中思，在践中悟
-          </h2>
-          <p class="cta-desc">
-            学思践悟，四维并进，让AI知识真正内化为你的能力与价值观。
-          </p>
+          <div class="cta-text">
+            <h2 class="cta-title">在学中思，在践中悟</h2>
+            <p class="cta-desc">学思践悟，四维并进，让 AI 知识真正内化为你的能力与价值观。</p>
+          </div>
           <div class="cta-actions">
             <button class="cta-btn primary" @click="router.push('/learn')">
-              开始学习之旅
+              开始学习
             </button>
             <button class="cta-btn secondary" @click="router.push('/act')">
-              了解公益行动
+              公益行动
             </button>
-          </div>
-
-          <div class="cta-modules">
-            <div class="cta-module" @click="router.push('/learn')">
-              <span class="cta-module-icon t">学</span>
-              <span>积累知识</span>
-            </div>
-            <div class="cta-sep">·</div>
-            <div class="cta-module" @click="router.push('/practice')">
-              <span class="cta-module-icon p">思</span>
-              <span>深化理解</span>
-            </div>
-            <div class="cta-sep">·</div>
-            <div class="cta-module" @click="router.push('/create')">
-              <span class="cta-module-icon c">践</span>
-              <span>动手创作</span>
-            </div>
-            <div class="cta-sep">·</div>
-            <div class="cta-module" @click="router.push('/act')">
-              <span class="cta-module-icon a">悟</span>
-              <span>感悟价值</span>
-            </div>
           </div>
         </div>
       </div>
@@ -59,17 +35,16 @@ const router = useRouter()
 
 <style scoped>
 .cta-section {
-  padding: var(--space-4xl) 0;
-  background: var(--color-bg-alt);
+  padding: var(--space-2xl) 0;
+  background: var(--color-bg);
 }
 
 .cta-card {
   position: relative;
-  padding: var(--space-4xl) var(--space-2xl);
+  padding: var(--space-xl) var(--space-2xl);
   background: var(--gradient-hero);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  text-align: center;
 }
 
 .cta-bg {
@@ -82,8 +57,8 @@ const router = useRouter()
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -94,77 +69,85 @@ const router = useRouter()
 }
 
 .cta-orb-1 {
-  width: 300px;
-  height: 300px;
-  background: rgba(45, 90, 110, 0.35);
-  top: -100px;
-  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: rgba(45, 90, 110, 0.3);
+  top: -60px;
+  right: -20px;
   animation: float1 15s ease-in-out infinite;
 }
 
 .cta-orb-2 {
-  width: 250px;
-  height: 250px;
-  background: rgba(58, 125, 92, 0.2);
-  bottom: -80px;
-  left: -30px;
+  width: 160px;
+  height: 160px;
+  background: rgba(58, 125, 92, 0.18);
+  bottom: -50px;
+  left: -10px;
   animation: float2 18s ease-in-out infinite;
 }
 
 @keyframes float1 {
   0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-20px, 20px); }
+  50% { transform: translate(-15px, 15px); }
 }
 @keyframes float2 {
   0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
+  50% { transform: translate(15px, -15px); }
 }
 
 .cta-content {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xl);
+}
+
+.cta-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .cta-title {
   font-family: var(--font-serif);
-  font-size: clamp(1.6rem, 4vw, 2.5rem);
+  font-size: clamp(1.2rem, 3vw, 1.5rem);
   font-weight: 900;
   color: white;
-  margin-bottom: var(--space-lg);
-  letter-spacing: 0.08em;
+  margin-bottom: var(--space-xs);
+  letter-spacing: 0.06em;
 }
 
 .cta-desc {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.8;
-  margin-bottom: var(--space-2xl);
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.7;
 }
 
 .cta-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
   gap: var(--space-md);
-  margin-bottom: var(--space-2xl);
+  flex-shrink: 0;
 }
 
 .cta-btn {
-  padding: 0.85rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0.65rem 1.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
   border-radius: var(--radius-md);
-  transition: all var(--duration-normal) var(--ease-out);
+  transition: all var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
 }
 
 .cta-btn.primary {
   color: var(--color-primary-dark);
   background: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .cta-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 
 .cta-btn.secondary {
@@ -175,73 +158,32 @@ const router = useRouter()
 
 .cta-btn.secondary:hover {
   background: rgba(255, 255, 255, 0.18);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
-.cta-modules {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-lg);
-}
-
-.cta-module {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color var(--duration-fast);
-}
-
-.cta-module:hover {
-  color: white;
-}
-
-.cta-module-icon {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 800;
-  border-radius: 6px;
-  color: white;
-}
-
-.cta-module-icon.t { background: rgba(45, 106, 122, 0.35); }
-.cta-module-icon.p { background: rgba(107, 76, 138, 0.35); }
-.cta-module-icon.c { background: rgba(184, 134, 11, 0.35); }
-.cta-module-icon.a { background: rgba(58, 125, 92, 0.35); }
-
-.cta-sep {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 1.2rem;
-}
-
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .cta-card {
-    padding: var(--space-3xl) var(--space-lg);
+    padding: var(--space-xl) var(--space-lg);
   }
 
+  .cta-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .cta-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
   .cta-actions {
     flex-direction: column;
   }
 
-  .cta-modules {
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .cta-sep {
-    display: none;
-  }
-
-  .cta-desc br {
-    display: none;
+  .cta-btn {
+    text-align: center;
   }
 }
 </style>

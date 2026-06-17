@@ -47,8 +47,8 @@ function handlePageChange(page: number) {
                     stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <h1>造 · 智创未来</h1>
-          <p>AI + 硬件创意作品展示，打破"AI 只是聊天框"的思维局限</p>
+          <h1>践 · 动手创作</h1>
+          <p>AI 创意作品展示，打破"AI 只是聊天框"的思维局限</p>
         </div>
       </div>
     </section>
@@ -58,7 +58,7 @@ function handlePageChange(page: number) {
       <div class="container">
         <div class="gallery-header">
           <h2>学生作品画廊</h2>
-          <p>每一件作品都是 AI 与硬件碰撞的火花</p>
+          <p>每一件作品都是 学生 和 AI 碰撞的火花</p>
         </div>
 
         <div class="projects-grid">
@@ -136,8 +136,8 @@ function handlePageChange(page: number) {
         <div class="upload-card">
           <div class="upload-content">
             <h3>提交你的作品</h3>
-            <p>将你的 AI + 硬件创意作品展示给更多人</p>
-            <p class="upload-hint">支持课程报告、演示视频链接、硬件接线图等</p>
+            <p>将你的 AI 创意作品展示给更多人</p>
+            <p class="upload-hint">支持课程报告、演示视频链接等</p>
           </div>
           <el-button type="warning" size="large" round @click="router.push('/create/upload')">
             上传作品

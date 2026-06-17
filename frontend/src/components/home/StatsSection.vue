@@ -1,74 +1,61 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-
-interface Stat {
-  value: number
-  label: string
-  suffix: string
-  desc: string
-}
-
-const stats: Stat[] = [
-  { value: 6, label: '课程模块', suffix: '个', desc: '系统知识体系' },
-  { value: 100, label: '练习题目', suffix: '+', desc: '强化思维反思' },
-  { value: 50, label: '学生作品', suffix: '+', desc: '践行创作成果' },
-  { value: 20, label: '公益行动', suffix: '+', desc: '感悟社会价值' },
+const loopItems = [
+  {
+    step: '01',
+    title: '学',
+    desc: '进入学习页查看真实课程内容与资料。',
+  },
+  {
+    step: '02',
+    title: '思',
+    desc: '通过练习和错题回看确认理解。',
+  },
+  {
+    step: '03',
+    title: '践',
+    desc: '把工具使用和课程理解沉淀为作品。',
+  },
+  {
+    step: '04',
+    title: '悟',
+    desc: '在公益行动与分享中理解 AI 的社会价值。',
+  },
 ]
 
-const counters = ref<number[]>(stats.map(() => 0))
-const sectionVisible = ref(false)
-
-function animateCounters() {
-  stats.forEach((stat, i) => {
-    const target = stat.value
-    const duration = 2000
-    const step = target / (duration / 16)
-    let current = 0
-
-    const timer = setInterval(() => {
-      current += step
-      if (current >= target) {
-        counters.value[i] = target
-        clearInterval(timer)
-      } else {
-        counters.value[i] = Math.floor(current)
-      }
-    }, 16)
-  })
-}
-
-onMounted(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0]?.isIntersecting && !sectionVisible.value) {
-        sectionVisible.value = true
-        animateCounters()
-      }
-    },
-    { threshold: 0.3 }
-  )
-
-  const el = document.querySelector('.stats-section')
-  if (el) observer.observe(el)
-})
+const orderItems = [
+  '先看学习页的课程与资料，不以首页旧模块作为课程依据。',
+  '完成一次练习后再进入作品区，避免只看不做。',
+  '最后阅读行动案例，把作品和社会议题联系起来。',
+]
 </script>
 
 <template>
   <section class="stats-section">
     <div class="container">
-      <div class="stats-grid fade-up">
-        <div
-          v-for="(stat, index) in stats"
-          :key="stat.label"
-          class="stat-card"
-          :style="{ transitionDelay: `${index * 0.1}s` }"
-        >
-          <div class="stat-value">
-            <span class="stat-number">{{ counters[index] }}</span>
-            <span class="stat-suffix">{{ stat.suffix }}</span>
+      <div class="loop-layout fade-up">
+        <div class="loop-copy">
+          <span class="section-tag">学习闭环</span>
+          <h2>首页只保留稳定路径</h2>
+          <p>
+            课程内容会随教学安排调整，首页不再展示过期的固定课程模块。学生从这里识别学习路径，再进入对应页面查看最新内容。
+          </p>
+        </div>
+
+        <div class="loop-detail">
+          <div class="flow-line">
+            <div v-for="item in loopItems" :key="item.step" class="flow-step">
+              <span class="loop-step">{{ item.step }}</span>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.desc }}</p>
+            </div>
           </div>
-          <div class="stat-label">{{ stat.label }}</div>
-          <div class="stat-desc">{{ stat.desc }}</div>
+
+          <div class="order-panel">
+            <h3>建议学习顺序</h3>
+            <ol>
+              <li v-for="item in orderItems" :key="item">{{ item }}</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
@@ -77,76 +64,131 @@ onMounted(() => {
 
 <style scoped>
 .stats-section {
-  padding: var(--space-4xl) 0;
-  background: var(--color-bg);
+  padding: var(--space-3xl) 0;
+  background: var(--color-bg-alt);
 }
 
-.stats-grid {
+.loop-layout {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-xl);
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-2xl);
+  align-items: start;
 }
 
-.stat-card {
-  text-align: center;
-  padding: var(--space-2xl) var(--space-lg);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  transition: all var(--duration-normal) var(--ease-out);
-}
-
-.stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-}
-
-.stat-value {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2px;
-  margin-bottom: var(--space-sm);
-}
-
-.stat-number {
-  font-size: 2.5rem;
-  font-weight: 900;
+.section-tag {
+  display: inline-block;
+  padding: 0.25rem 0.72rem;
   color: var(--color-primary);
-  font-family: var(--font-mono);
-  line-height: 1;
+  background: var(--color-primary-glow);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-md);
 }
 
-.stat-suffix {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--color-primary-light);
-}
-
-.stat-label {
-  font-family: var(--font-serif);
-  font-size: 0.92rem;
-  font-weight: 700;
+.loop-copy h2 {
+  margin-bottom: var(--space-sm);
   color: var(--color-text);
-  margin-bottom: var(--space-xs);
+  font-family: var(--font-serif);
+  font-size: 1.55rem;
+  font-weight: 900;
   letter-spacing: 0.03em;
 }
 
-.stat-desc {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  line-height: 1.5;
+.loop-copy p {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.8;
+}
+
+.loop-detail {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.flow-line {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.flow-step {
+  min-height: 168px;
+  padding: var(--space-lg);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.loop-step {
+  display: block;
+  margin-bottom: var(--space-lg);
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.flow-step strong {
+  display: block;
+  margin-bottom: var(--space-sm);
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+}
+
+.flow-step p {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.order-panel {
+  padding: var(--space-lg);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.order-panel h3 {
+  margin-bottom: var(--space-md);
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.order-panel ol {
+  display: grid;
+  gap: var(--space-sm);
+  padding-left: 1.2rem;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.7;
 }
 
 @media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .loop-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-line {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 480px) {
-  .stats-grid {
+@media (max-width: 640px) {
+  .stats-section {
+    padding: var(--space-2xl) 0;
+  }
+
+  .flow-line {
     grid-template-columns: 1fr;
+  }
+
+  .flow-step {
+    min-height: auto;
   }
 }
 </style>

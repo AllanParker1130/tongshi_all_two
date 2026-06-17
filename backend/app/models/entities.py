@@ -120,7 +120,7 @@ class QuizAttempt(Base):
     user_id = Column(String(32), ForeignKey(
         "users.id"), nullable=False, index=True)
     question_id = Column(Integer, ForeignKey(
-        "questions.id"), nullable=False, index=True)
+        "questions.id", ondelete="CASCADE"), nullable=False, index=True)
     announcement_id = Column(Integer, ForeignKey(
         "announcements.id", ondelete="CASCADE"), nullable=True, index=True)
     user_answer = Column(String(128), default="")

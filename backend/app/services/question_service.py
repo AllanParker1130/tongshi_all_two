@@ -241,17 +241,19 @@ def get_course_detail(db: Session, course_id: int, teacher_id: str | None = None
     return course, material_count, question_count, class_count
 
 
-def import_questions_from_excel(db: Session, rows: list[dict], teacher_id: str):
+def import_questions_from_excel(db: Session, rows: list[dict], teacher_id: str, role: str = "teacher"):
     success_count = 0
     fail_count = 0
+    skip_count = 0
     errors = []
+    skips = []
     for idx, row in enumerate(rows, start=2):
         try:
             course_name = str(_row_value(row, "课程名称", "课程", "course", "course_name")).strip()
-            course = db.query(Course).filter(
-                Course.name == course_name,
-                Course.created_by == teacher_id,
-            ).first()
+            query = db.query(Course).filter(Course.name == course_name)
+            if role != "admin":
+                query = query.filter(Course.created_by == teacher_id)
+            course = query.first()
             if not course:
                 raise BusinessException(400, f"未找到课程: {course_name}")
             q_type = str(_row_value(row, "题型", "type")).strip()
@@ -267,6 +269,15 @@ def import_questions_from_excel(db: Session, rows: list[dict], teacher_id: str):
                 raise BusinessException(400, "题型必须为 choice、fill 或 multi_choice")
             if q_type in {"choice", "multi_choice"} and not option_list:
                 raise BusinessException(400, "选择题必须填写选项")
+            # 检查同一课程下是否已存在相同题干的题目
+            exists = db.query(Question).filter(
+                Question.course_id == course.id,
+                Question.stem == stem
+            ).first()
+            if exists:
+                skip_count += 1
+                skips.append({"row": idx, "reason": f"已存在相同题目（题干: {stem[:50]}），已跳过"})
+                continue
             q = Question(type=q_type, course_id=course.id, stem=stem,
                          options=option_list, answer=answer, explanation=explanation, tags=tags)
             db.add(q)
@@ -275,4 +286,4 @@ def import_questions_from_excel(db: Session, rows: list[dict], teacher_id: str):
             fail_count += 1
             errors.append({"row": idx, "reason": str(exc)})
     db.commit()
-    return {"success_count": success_count, "fail_count": fail_count, "errors": errors}
+    return {"success_count": success_count, "fail_count": fail_count, "skip_count": skip_count, "errors": errors, "skips": skips}

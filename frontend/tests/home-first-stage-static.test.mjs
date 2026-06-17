@@ -1,0 +1,101 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+function read(relativePath) {
+  return readFileSync(resolve(root, relativePath), 'utf8')
+}
+
+const homeView = read('src/views/HomeView.vue')
+const hero = read('src/components/home/HeroSection.vue')
+const modules = read('src/components/home/ModuleShowcase.vue')
+const stats = read('src/components/home/StatsSection.vue')
+
+assert.doesNotMatch(
+  homeView,
+  /CoursePreview/,
+  '首页应先移除旧的六块课程预览，不再导入或渲染 CoursePreview。',
+)
+
+for (const route of ['/learn', '/practice', '/create', '/act']) {
+  assert.match(
+    hero,
+    new RegExp(`route:\\s*'${route}'`),
+    `首屏应提供 ${route} 的直接入口。`,
+  )
+}
+
+assert.match(
+  hero,
+  /router\.push\(entry\.route\)/,
+  '首屏入口应通过数据驱动的 entry.route 跳转。',
+)
+
+assert.match(
+  hero,
+  /entry-grid/,
+  '首屏四个入口应使用 entry-grid 组织，便于学生快速选择下一步。',
+)
+
+assert.match(
+  hero,
+  /今日建议/,
+  '首屏应包含“今日建议”内容承接，避免过度简约。',
+)
+
+assert.match(
+  hero,
+  /suggestion-panel/,
+  '首屏应使用 suggestion-panel 展示具体行动建议。',
+)
+
+assert.doesNotMatch(
+  modules,
+  /card-features/,
+  '四模块卡片应精简，不再展示长列表功能点。',
+)
+
+assert.match(
+  modules,
+  /module-status/,
+  '四模块卡片应展示更短的状态型提示。',
+)
+
+assert.match(
+  modules,
+  /module-actions/,
+  '四模块卡片应补充短条目，说明学生可以具体做什么。',
+)
+
+assert.match(
+  stats,
+  /学习闭环/,
+  '统计区应改为学习闭环说明，避免继续展示过期或静态宣传数字。',
+)
+
+assert.match(
+  stats,
+  /建议学习顺序/,
+  '学习闭环区应包含建议学习顺序，增强内容密度。',
+)
+
+assert.match(
+  stats,
+  /flow-line/,
+  '学习闭环区应提供横向流程结构。',
+)
+
+assert.doesNotMatch(
+  stats,
+  /setInterval/,
+  '统计区不应再使用数字滚动动画。',
+)
+
+assert.match(
+  hero,
+  /@media \(max-width: 768px\)/,
+  '首屏应保留移动端布局优化。',
+)

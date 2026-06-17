@@ -69,6 +69,12 @@ const router = createRouter({
       meta: { title: '行 · 知行合一' },
     },
     {
+      path: '/act/showcase/:id',
+      name: 'act-showcase-detail',
+      component: () => import('../views/ActDetailView.vue'),
+      meta: { title: '行动详情' },
+    },
+    {
       path: '/practice/assignments',
       name: 'practice-assignments',
       component: () => import('../views/PracticeAssignments.vue'),

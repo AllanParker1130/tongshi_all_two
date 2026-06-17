@@ -518,9 +518,28 @@ onMounted(() => fetchCourses())
                 <el-button type="primary" size="small" @click="openCreateQuestion">新增题目</el-button>
               </div>
               <el-table :data="questions" v-loading="contentLoading" border stripe style="width: 100%">
-                <el-table-column prop="stem" label="题干" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="type" label="题型" width="90" />
-                <el-table-column prop="answer" label="答案" width="120" show-overflow-tooltip />
+                <el-table-column label="题干" min-width="260">
+                  <template #default="{ row }">
+                    <span>{{ row.stem.length > 48 ? row.stem.slice(0, 48) + '…' : row.stem }}</span>
+                    <span v-if="row.type === 'multi_choice'" class="multi-tag">（多选题）</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="题型" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="row.type === 'choice' ? '' : row.type === 'multi_choice' ? 'warning' : 'success'" size="small" effect="plain">
+                      {{ row.type === 'choice' ? '选择题' : row.type === 'multi_choice' ? '多选题' : '填空题' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="course_name" label="所属课程" min-width="160" />
+                <el-table-column label="课程标签" min-width="150">
+                  <template #default="{ row }">
+                    <div class="tag-list">
+                      <el-tag v-for="tag in row.tags || []" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+                      <span v-if="!row.tags?.length" class="readonly-text">-</span>
+                    </div>
+                  </template>
+                </el-table-column>
                 <el-table-column label="操作" width="130" fixed="right">
                   <template #default="{ row }">
                     <el-button size="small" text @click="openEditQuestion(row)">编辑</el-button>
@@ -803,6 +822,23 @@ onMounted(() => fetchCourses())
 
 .download-btn {
   align-self: flex-start;
+}
+
+.multi-tag {
+  margin-left: var(--space-xs);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.readonly-text {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
 }
 
 </style>

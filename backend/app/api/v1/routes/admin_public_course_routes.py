@@ -1,13 +1,17 @@
 """管理员公共课程路由。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from io import BytesIO
+
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
 from app.core.response import success
 from app.core.security import require_role
+from app.core.upload_validation import ALLOWED_EXCEL_EXTENSIONS, MAX_EXCEL_SIZE, validate_upload
 from app.db.session import get_db
+from app.models.entities import Question
 from app.schemas.common import (
     AdminMaterialUpdate,
     AdminPublicCourseCreate,
@@ -17,6 +21,7 @@ from app.schemas.common import (
     AuthUser,
 )
 from app.services import admin_public_course_service as service
+from openpyxl import load_workbook
 
 router = APIRouter(prefix="/public-courses", tags=["admin-public-courses"])
 
@@ -64,6 +69,7 @@ def _format_question(question) -> dict:
         "options": question.options or [],
         "answer": question.answer,
         "explanation": question.explanation or "",
+        "tags": question.tags or [],
         "source_question_id": question.source_question_id,
         "is_synced": bool(question.source_question_id),
     }
@@ -183,6 +189,50 @@ def add_public_question(
 ):
     question = service.create_public_question(db, course_id, data.model_dump())
     return success(_format_question(question))
+
+
+@router.post("/{course_id}/questions/import", summary="Excel 批量导入公共课程题目", description="管理员：上传 Excel 批量导入题目到公共课程并同步教师副本")
+def import_public_questions(
+    course_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(require_role("admin")),
+):
+    course = service.get_course_by_id(db, course_id)
+    if not course or not course.is_public:
+        raise BusinessException(404, "公共课程不存在")
+    content = file.file.read()
+    err = validate_upload(file.filename, len(content), allowed_extensions=ALLOWED_EXCEL_EXTENSIONS, max_size=MAX_EXCEL_SIZE)
+    if err:
+        raise BusinessException(400, err)
+    try:
+        wb = load_workbook(filename=BytesIO(content), data_only=True)
+    except Exception:
+        raise BusinessException(400, "Excel 文件读取失败，请确认文件是 .xlsx/.xls 格式，且没有损坏或被加密")
+    ws = wb.active
+    if ws.max_row < 2:
+        raise BusinessException(400, "Excel 中没有可导入的题目数据，请至少保留表头并填写一行题目")
+    headers = [str(c.value).strip() if c.value is not None else "" for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    required_header_groups = [
+        ("题型", ["题型", "type"]),
+        ("课程名称", ["课程名称", "课程", "course", "course_name"]),
+        ("题干", ["题干", "stem"]),
+        ("答案", ["答案", "answer"]),
+    ]
+    missing_headers = [
+        label for label, candidates in required_header_groups if not any(candidate in headers for candidate in candidates)
+    ]
+    if missing_headers:
+        raise BusinessException(400, f"Excel 表头缺少：{', '.join(missing_headers)}。请下载题库导入模板后按模板填写")
+    rows = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if all(cell is None or str(cell).strip() == "" for cell in row):
+            continue
+        item = {headers[i]: row[i] if i < len(row) else None for i in range(len(headers))}
+        rows.append(item)
+    if not rows:
+        raise BusinessException(400, "Excel 中没有可导入的题目数据，请填写题目内容后再上传")
+    return success(service.import_questions_to_public_course(db, course_id, rows))
 
 
 @router.put("/{course_id}/questions/{question_id}", summary="编辑公共课程题目", description="管理员：修改题目并同步教师副本")

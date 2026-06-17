@@ -118,7 +118,7 @@ function startAction() {
               />
             </svg>
           </div>
-          <h1>行 · 知行合一</h1>
+          <h1>悟 · 感悟价值</h1>
           <p>把课堂学习延伸到社区、学校和项目实践中，记录每一次行动带来的成长。</p>
           <div class="hero-actions">
             <el-button type="success" size="large" round @click="startAction">
@@ -201,13 +201,11 @@ function startAction() {
             <div class="showcase-body">
               <div class="showcase-title">{{ item.title }}</div>
               <div v-if="item.content" class="showcase-content">{{ item.content }}</div>
-              <a
-                v-if="item.link_url"
-                :href="item.link_url"
-                target="_blank"
-                rel="noopener"
+              <button
+                type="button"
                 class="showcase-link"
-              >了解详情 →</a>
+                @click="router.push(`/act/showcase/${item.id}`)"
+              >了解详情 →</button>
             </div>
           </div>
         </div>
@@ -237,13 +235,11 @@ function startAction() {
             <div class="showcase-body">
               <div class="showcase-title">{{ item.title }}</div>
               <div v-if="item.content" class="showcase-content">{{ item.content }}</div>
-              <a
-                v-if="item.link_url"
-                :href="item.link_url"
-                target="_blank"
-                rel="noopener"
+              <button
+                type="button"
                 class="showcase-link"
-              >了解详情 →</a>
+                @click="router.push(`/act/showcase/${item.id}`)"
+              >了解详情 →</button>
             </div>
           </div>
         </div>
@@ -808,15 +804,24 @@ function startAction() {
 }
 
 .showcase-content {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: 0.82rem;
   color: var(--color-text-secondary);
   line-height: 1.7;
   margin-bottom: var(--space-md);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
 }
 
 .showcase-link {
   display: inline-block;
+  padding: 0;
   color: var(--color-act);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;

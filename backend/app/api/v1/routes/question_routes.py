@@ -252,7 +252,7 @@ def download_multi_choice_question_template(current_user: AuthUser = Depends(req
 
 
 @router.post("/import", summary="Excel 批量导入题目", description="教师端：上传 Excel 批量导入题目（.xlsx，表头：题型/课程名称/题干/选项/答案/解析）")
-def import_questions(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: AuthUser = Depends(require_role("teacher"))):
+def import_questions(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: AuthUser = Depends(require_roles("teacher", "admin"))):
     content = file.file.read()
     err = validate_upload(file.filename, len(
         content), allowed_extensions=ALLOWED_EXCEL_EXTENSIONS, max_size=MAX_EXCEL_SIZE)
@@ -289,4 +289,4 @@ def import_questions(file: UploadFile = File(...), db: Session = Depends(get_db)
         rows.append(item)
     if not rows:
         raise BusinessException(400, "Excel 中没有可导入的题目数据，请填写题目内容后再上传")
-    return success(import_questions_from_excel(db, rows, current_user.id))
+    return success(import_questions_from_excel(db, rows, current_user.id, role=current_user.role))

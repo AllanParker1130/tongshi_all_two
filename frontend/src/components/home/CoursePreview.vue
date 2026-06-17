@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const modules = [
   { num: '01', title: '人工智能概述', desc: '从图灵测试到深度学习，AI 发展全景扫描', icon: '&#9670;', tag: '基础' },
   { num: '02', title: '计算机基础知识', desc: '办公软件使用基础与计算思维入门', icon: '&#9632;', tag: '入门' },
@@ -9,8 +7,6 @@ const modules = [
   { num: '05', title: 'AI 前沿与应用', desc: '结合专业的前沿应用场景探索', icon: '&#9830;', tag: '前沿' },
   { num: '06', title: 'AI 伦理与未来', desc: '技术向善，负责任的人工智能发展之路', icon: '&#9829;', tag: '思辨' },
 ]
-
-const hoveredIndex = ref(-1)
 </script>
 
 <template>
@@ -30,10 +26,7 @@ const hoveredIndex = ref(-1)
           v-for="(ch, index) in modules"
           :key="ch.num"
           class="module-card"
-          :class="{ hovered: hoveredIndex === index }"
           :style="{ '--index': index }"
-          @mouseenter="hoveredIndex = index"
-          @mouseleave="hoveredIndex = -1"
         >
           <div class="module-num">{{ ch.num }}</div>
           <div class="module-content">
@@ -53,13 +46,13 @@ const hoveredIndex = ref(-1)
 
 <style scoped>
 .course-preview {
-  padding: var(--space-4xl) 0;
+  padding: var(--space-3xl) 0;
   background: var(--color-bg-alt);
 }
 
 .section-header {
   text-align: center;
-  margin-bottom: var(--space-3xl);
+  margin-bottom: var(--space-2xl);
 }
 
 .section-tag {

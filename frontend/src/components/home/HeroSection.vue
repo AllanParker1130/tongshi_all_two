@@ -1,539 +1,293 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const heroRef = ref<HTMLElement>()
-const mouseX = ref(0)
-const mouseY = ref(0)
-const loaded = ref(false)
 
-// Floating particles
-const particles = Array.from({ length: 20 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 4 + 2,
-  delay: Math.random() * 5,
-  duration: Math.random() * 10 + 15,
-}))
-
-function handleMouseMove(e: MouseEvent) {
-  if (!heroRef.value) return
-  const rect = heroRef.value.getBoundingClientRect()
-  mouseX.value = ((e.clientX - rect.left) / rect.width - 0.5) * 20
-  mouseY.value = ((e.clientY - rect.top) / rect.height - 0.5) * 20
-}
-
-onMounted(() => {
-  setTimeout(() => { loaded.value = true }, 100)
-})
+const entries = [
+  {
+    key: 'learn',
+    mark: '学',
+    title: '开始学习',
+    desc: '进入课程与资料，按教学安排继续学习。',
+    route: '/learn',
+    tone: 'learn',
+  },
+  {
+    key: 'practice',
+    mark: '思',
+    title: '去练习',
+    desc: '完成题目练习，检查理解和错题。',
+    route: '/practice',
+    tone: 'practice',
+  },
+  {
+    key: 'create',
+    mark: '践',
+    title: '看作品',
+    desc: '浏览同学作品，提交自己的实践成果。',
+    route: '/create',
+    tone: 'create',
+  },
+  {
+    key: 'act',
+    mark: '悟',
+    title: '看行动',
+    desc: '查看公益课、读书会与社区行动记录。',
+    route: '/act',
+    tone: 'act',
+  },
+]
 </script>
 
 <template>
-  <section ref="heroRef" class="hero" @mousemove="handleMouseMove">
-    <!-- Animated background -->
-    <div class="hero-bg">
-      <div class="grid-pattern"></div>
-      <div
-        class="orb orb-1"
-        :style="{ transform: `translate(${mouseX * 0.5}px, ${mouseY * 0.5}px)` }"
-      ></div>
-      <div
-        class="orb orb-2"
-        :style="{ transform: `translate(${mouseX * -0.3}px, ${mouseY * -0.3}px)` }"
-      ></div>
-      <div
-        class="orb orb-3"
-        :style="{ transform: `translate(${mouseX * 0.2}px, ${mouseY * 0.2}px)` }"
-      ></div>
-    </div>
-
-    <!-- Floating particles -->
-    <div class="particles">
-      <div
-        v-for="p in particles"
-        :key="p.id"
-        class="particle"
-        :style="{
-          left: p.x + '%',
-          top: p.y + '%',
-          width: p.size + 'px',
-          height: p.size + 'px',
-          animationDelay: p.delay + 's',
-          animationDuration: p.duration + 's',
-        }"
-      ></div>
-    </div>
-
-    <!-- Content -->
-    <div class="hero-content container" :class="{ loaded }">
-      <div class="hero-badge">
-        <span class="badge-dot"></span>
-        面向理工科新生 · 人工智能通识课
+  <section class="hero">
+    <div class="container hero-layout">
+      <div class="hero-copy">
+        <div class="hero-badge">AI 通识教育课程平台</div>
+        <h1>
+          <span>学 · 思 · 践 · 悟</span>
+          <strong>AI 通识，从这里开始</strong>
+        </h1>
+        <p>
+          六个课程模块，覆盖从 AI 基础理论到工具实践再到伦理思辨的完整知识体系。选择一个方向，开始你的通识之旅。
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary" type="button" @click="router.push('/learn')">
+            继续学习
+          </button>
+          <button class="btn-secondary" type="button" @click="router.push('/practice')">
+            查看练习
+          </button>
+        </div>
       </div>
 
-      <h1 class="hero-title">
-        <span class="title-line">
-          <span class="char t">学</span>
-          <span class="char-dot">·</span>
-          <span class="char p">思</span>
-          <span class="char-dot">·</span>
-          <span class="char c">践</span>
-          <span class="char-dot">·</span>
-          <span class="char a">悟</span>
-        </span>
-        <span class="title-sub">在学中思，在践中悟</span>
-      </h1>
-
-      <p class="hero-desc">
-        以“学思践悟”四维框架，系统学习AI通识知识，深化反思练习，动手实践创作，在公益行动中感悟价值。
-      </p>
-
-      <div class="hero-actions">
-        <button class="btn-primary" @click="router.push('/learn')">
-          <span>开始学习</span>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M4 10h12m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="btn-secondary" @click="router.push('/create')">
-          浏览学生作品
+      <div class="entry-grid" aria-label="学生常用入口">
+        <button
+          v-for="entry in entries"
+          :key="entry.key"
+          class="entry-card"
+          :class="`entry-${entry.tone}`"
+          type="button"
+          @click="router.push(entry.route)"
+        >
+          <span class="entry-mark">{{ entry.mark }}</span>
+          <span class="entry-main">
+            <strong>{{ entry.title }}</strong>
+            <span>{{ entry.desc }}</span>
+          </span>
         </button>
       </div>
-
-      <!-- Module quick access -->
-      <div class="hero-modules">
-        <div class="module-chip" @click="router.push('/learn')">
-          <span class="chip-icon chip-learn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 6.25278V19.2528M12 6.25278C10.8321 5.47686 9.24649 5 7.5 5C5.75351 5 4.16789 5.47686 3 6.25278V19.2528C4.16789 18.4769 5.75351 18 7.5 18C9.24649 18 10.8321 18.4769 12 19.2528M12 6.25278C13.1679 5.47686 14.7535 5 16.5 5C18.2465 5 19.8321 5.47686 21 6.25278V19.2528C19.8321 18.4769 18.2465 18 16.5 18C14.7535 18 13.1679 18.4769 12 19.2528"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span>学</span>
-        </div>
-        <div class="module-chip" @click="router.push('/practice')">
-          <span class="chip-icon chip-practice">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span>思</span>
-        </div>
-        <div class="module-chip" @click="router.push('/create')">
-          <span class="chip-icon chip-create">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span>践</span>
-        </div>
-        <div class="module-chip" @click="router.push('/act')">
-          <span class="chip-icon chip-act">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.841m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span>悟</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Scroll indicator -->
-    <div class="scroll-hint" :class="{ loaded }">
-      <div class="scroll-mouse">
-        <div class="scroll-dot"></div>
-      </div>
-      <span>向下滚动</span>
     </div>
   </section>
 </template>
 
 <style scoped>
 .hero {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
+  padding: calc(60px + var(--space-3xl)) 0 var(--space-2xl);
+  background:
+    linear-gradient(135deg, rgba(26, 61, 77, 0.96), rgba(45, 90, 110, 0.94)),
+    var(--color-primary-dark);
+}
+
+.hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+  gap: var(--space-3xl);
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: var(--gradient-hero);
-  padding-top: 60px;
 }
 
-/* ── Background ── */
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
+.hero-copy {
+  color: var(--color-bg-card);
 }
 
-.grid-pattern {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  transition: transform 0.3s ease-out;
-  will-change: transform;
-}
-
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  background: rgba(45, 90, 110, 0.3);
-  top: -200px;
-  right: -100px;
-  animation: float1 20s ease-in-out infinite;
-}
-
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  background: rgba(58, 125, 92, 0.15);
-  bottom: -100px;
-  left: -50px;
-  animation: float2 25s ease-in-out infinite;
-}
-
-.orb-3 {
-  width: 300px;
-  height: 300px;
-  background: rgba(184, 134, 11, 0.1);
-  top: 40%;
-  left: 60%;
-  animation: float3 18s ease-in-out infinite;
-}
-
-@keyframes float1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, 30px) scale(1.1); }
-}
-@keyframes float2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, -40px) scale(1.05); }
-}
-@keyframes float3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-20px, 20px) scale(0.95); }
-}
-
-/* ── Particles ── */
-.particles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.particle {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  animation: particleFloat linear infinite;
-}
-
-@keyframes particleFloat {
-  0% {
-    transform: translateY(0) translateX(0);
-    opacity: 0;
-  }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% {
-    transform: translateY(-100vh) translateX(30px);
-    opacity: 0;
-  }
-}
-
-/* ── Content ── */
-.hero-content {
-  position: relative;
-  z-index: 10;
-  text-align: center;
-  color: white;
-  max-width: 800px;
-  padding: var(--space-4xl) var(--space-xl);
-}
-
-.hero-content > * {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: all 0.8s var(--ease-out);
-}
-
-.hero-content.loaded > * {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.hero-content.loaded > *:nth-child(1) { transition-delay: 0.1s; }
-.hero-content.loaded > *:nth-child(2) { transition-delay: 0.25s; }
-.hero-content.loaded > *:nth-child(3) { transition-delay: 0.4s; }
-.hero-content.loaded > *:nth-child(4) { transition-delay: 0.55s; }
-.hero-content.loaded > *:nth-child(5) { transition-delay: 0.7s; }
-
-/* Badge */
 .hero-badge {
   display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 0.4rem 1rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-full);
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  margin-bottom: var(--space-2xl);
-  backdrop-filter: blur(10px);
+  margin-bottom: var(--space-lg);
+  padding: 0.32rem 0.72rem;
+  color: rgba(255, 253, 248, 0.82);
+  background: rgba(255, 253, 248, 0.08);
+  border: 1px solid rgba(255, 253, 248, 0.14);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: pulse 2s ease-in-out infinite;
+.hero-copy h1 {
+  margin-bottom: var(--space-lg);
+  font-family: var(--font-serif);
+  line-height: 1.2;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.3); }
-}
-
-/* Title */
-.hero-title {
-  margin-bottom: var(--space-xl);
-}
-
-.title-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3em;
-  font-size: clamp(3rem, 8vw, 5.5rem);
-  font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.char {
-  display: inline-block;
-  background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  transition: transform 0.4s var(--ease-spring);
-}
-
-.char:hover {
-  transform: scale(1.1) rotate(-3deg);
-}
-
-.char.t { animation: charGlow 4s ease-in-out infinite 0s; }
-.char.p { animation: charGlow 4s ease-in-out infinite 1s; }
-.char.c { animation: charGlow 4s ease-in-out infinite 2s; }
-.char.a { animation: charGlow 4s ease-in-out infinite 3s; }
-
-@keyframes charGlow {
-  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
-  50% { filter: drop-shadow(0 0 20px rgba(45, 90, 110, 0.4)); }
-}
-
-.char-dot {
-  font-size: 0.6em;
-  color: rgba(255, 255, 255, 0.3);
-  font-weight: 300;
-}
-
-.title-sub {
+.hero-copy h1 span,
+.hero-copy h1 strong {
   display: block;
-  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: var(--space-md);
-  letter-spacing: 0.15em;
 }
 
-/* Description */
-.hero-desc {
-  font-size: clamp(0.9rem, 1.5vw, 1.05rem);
-  color: rgba(255, 255, 255, 0.55);
-  line-height: 1.8;
-  margin-bottom: var(--space-2xl);
+.hero-copy h1 span {
+  margin-bottom: var(--space-sm);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(255, 253, 248, 0.68);
 }
 
-/* Actions */
+.hero-copy h1 strong {
+  max-width: 640px;
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.hero-copy p {
+  max-width: 560px;
+  color: rgba(255, 253, 248, 0.72);
+  font-size: 1rem;
+  line-height: 1.85;
+}
+
 .hero-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
   gap: var(--space-md);
-  margin-bottom: var(--space-3xl);
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 0.85rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-primary-dark);
-  background: white;
-  border-radius: var(--radius-full);
-  transition: all var(--duration-normal) var(--ease-out);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.25);
-}
-
-.btn-primary svg {
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-
-.btn-primary:hover svg {
-  transform: translateX(4px);
-}
-
-.btn-secondary {
-  padding: 0.85rem 2rem;
-  font-size: 1rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-full);
-  transition: all var(--duration-normal) var(--ease-out);
-  backdrop-filter: blur(10px);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-}
-
-/* Module chips */
-.hero-modules {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
+  margin-top: var(--space-xl);
   flex-wrap: wrap;
 }
 
-.module-chip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 0.5rem 1.1rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--ease-out);
-  backdrop-filter: blur(10px);
+.btn-primary,
+.btn-secondary {
+  padding: 0.78rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
 }
 
-.module-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: white;
+.btn-primary {
+  color: var(--color-primary-dark);
+  background: var(--color-bg-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.btn-secondary {
+  color: var(--color-bg-card);
+  background: rgba(255, 253, 248, 0.08);
+  border: 1px solid rgba(255, 253, 248, 0.18);
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary:active,
+.btn-secondary:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.entry-card {
+  display: flex;
+  gap: var(--space-md);
+  min-height: 156px;
+  padding: var(--space-lg);
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  border: 1px solid rgba(255, 253, 248, 0.18);
+  border-radius: var(--radius-md);
+  text-align: left;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+
+.entry-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
 }
 
-.chip-icon {
-  display: flex;
+.entry-card:active {
+  transform: translateY(1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.entry-mark {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  color: var(--color-bg-card);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-serif);
+  font-weight: 900;
 }
 
-.chip-learn { background: rgba(6, 182, 212, 0.2); color: var(--color-learn-light); }
-.chip-practice { background: rgba(139, 92, 246, 0.2); color: var(--color-practice-light); }
-.chip-create { background: rgba(245, 158, 11, 0.2); color: var(--color-create-light); }
-.chip-act { background: rgba(16, 185, 129, 0.2); color: var(--color-act-light); }
+.entry-learn .entry-mark {
+  background: var(--color-learn);
+}
 
-/* Scroll hint */
-.scroll-hint {
-  position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
+.entry-practice .entry-mark {
+  background: var(--color-practice);
+}
+
+.entry-create .entry-mark {
+  background: var(--color-create);
+}
+
+.entry-act .entry-mark {
+  background: var(--color-act);
+}
+
+.entry-main {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  opacity: 0;
-  transition: opacity 1s var(--ease-out) 1.2s;
+  gap: var(--space-xs);
 }
 
-.scroll-hint.loaded {
-  opacity: 1;
+.entry-main strong {
+  color: var(--color-text);
+  font-size: 1.02rem;
 }
 
-.scroll-mouse {
-  width: 22px;
-  height: 34px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 11px;
-  display: flex;
-  justify-content: center;
-  padding-top: 6px;
+.entry-main span {
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.65;
 }
 
-.scroll-dot {
-  width: 3px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 2px;
-  animation: scrollDot 2s ease-in-out infinite;
-}
+@media (max-width: 900px) {
+  .hero {
+    min-height: auto;
+    padding: calc(60px + var(--space-2xl)) 0 var(--space-2xl);
+  }
 
-@keyframes scrollDot {
-  0%, 100% { transform: translateY(0); opacity: 1; }
-  50% { transform: translateY(8px); opacity: 0.3; }
+  .hero-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-2xl);
+  }
+
+  .hero-copy h1 strong {
+    font-size: 2.2rem;
+  }
 }
 
 @media (max-width: 768px) {
-  .hero-content {
-    padding: var(--space-2xl) var(--space-lg);
+  .hero {
+    padding: calc(60px + var(--space-xl)) 0 var(--space-xl);
   }
 
-  .hero-actions {
-    flex-direction: column;
+  .entry-grid {
+    grid-template-columns: 1fr;
   }
 
-  .hero-modules {
-    gap: var(--space-sm);
-  }
-
-  .hero-desc br {
-    display: none;
+  .entry-card {
+    min-height: auto;
   }
 }
 </style>
