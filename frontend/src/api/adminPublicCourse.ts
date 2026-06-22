@@ -24,6 +24,7 @@ export interface AdminQuestionPayload {
   options: string[]
   answer: string
   explanation: string
+  tags: string[]
 }
 
 export function getAdminPublicCourses() {
@@ -82,4 +83,15 @@ export function importAdminPublicQuestions(courseId: number, file: File) {
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
+}
+
+export async function downloadAdminQuestionTemplate(type: 'all' | 'choice' | 'fill' | 'multi_choice' = 'all') {
+  const token = localStorage.getItem('auth_token')
+  const response = await fetch(`/api/admin/public-courses/questions/import/template?template_type=${type}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!response.ok) {
+    throw new Error('模板下载失败')
+  }
+  return await response.blob()
 }

@@ -21,6 +21,18 @@ class StorageAdapter(Protocol):
         """保存字节内容，返回 StoredObject"""
         ...
 
+    def save_fileobj(
+        self,
+        *,
+        fileobj: BinaryIO,
+        object_key: str,
+        content_type: str = "",
+        bucket_name: str = "",
+        size_bytes: int = 0,
+    ) -> StoredObject:
+        """保存文件对象内容，供远端存储流式上传使用。"""
+        ...
+
     def open_stream(self, *, object_key: str) -> BinaryIO:
         """打开文件流，调用方负责关闭"""
         ...

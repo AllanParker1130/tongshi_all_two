@@ -2,6 +2,7 @@
 from typing import BinaryIO
 
 import boto3
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -31,6 +32,12 @@ class S3StorageAdapter:
         )
         self._bucket_public = settings.s3_bucket_public
         self._bucket_private = settings.s3_bucket_private
+        self._transfer_config = TransferConfig(
+            multipart_threshold=8 * 1024 * 1024,
+            multipart_chunksize=8 * 1024 * 1024,
+            max_concurrency=1,
+            use_threads=False,
+        )
 
     def _resolve_bucket(self, bucket_name: str = "") -> str:
         return bucket_name or self._bucket_public
@@ -55,6 +62,32 @@ class S3StorageAdapter:
             stored_name=object_key,
             content_type=content_type,
             size_bytes=len(content),
+        )
+
+    def save_fileobj(
+        self,
+        *,
+        fileobj: BinaryIO,
+        object_key: str,
+        content_type: str = "",
+        bucket_name: str = "",
+        size_bytes: int = 0,
+    ) -> StoredObject:
+        bucket = self._resolve_bucket(bucket_name)
+        upload_kwargs = {}
+        if content_type:
+            upload_kwargs["ExtraArgs"] = {"ContentType": content_type}
+        if self._transfer_config is not None:
+            upload_kwargs["Config"] = self._transfer_config
+
+        self._client.upload_fileobj(fileobj, bucket, object_key, **upload_kwargs)
+        return StoredObject(
+            storage_provider="s3",
+            bucket_name=bucket,
+            object_key=object_key,
+            stored_name=object_key,
+            content_type=content_type,
+            size_bytes=size_bytes,
         )
 
     def open_stream(self, *, object_key: str, bucket_name: str = "") -> BinaryIO:

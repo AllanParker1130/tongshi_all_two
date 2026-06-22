@@ -1,4 +1,6 @@
 """S3 存储适配器单元测试（moto mock - 不依赖真实 S3 服务）"""
+import io
+
 import pytest
 import boto3
 from moto import mock_aws
@@ -50,6 +52,23 @@ class TestS3StorageAdapter:
         assert stored.bucket_name == "test-public"
 
         stream = s3_adapter.open_stream(object_key="test/hello.txt")
+        assert stream.read() == content
+
+    def test_save_fileobj_and_open_stream(self, s3_adapter):
+        """save_fileobj 后 open_stream 能正确读取内容。"""
+        content = b"Hello S3 streaming upload"
+        stored = s3_adapter.save_fileobj(
+            fileobj=io.BytesIO(content),
+            object_key="test/streaming.txt",
+            content_type="text/plain",
+            size_bytes=len(content),
+        )
+
+        assert stored.storage_provider == "s3"
+        assert stored.size_bytes == len(content)
+        assert stored.bucket_name == "test-public"
+
+        stream = s3_adapter.open_stream(object_key="test/streaming.txt")
         assert stream.read() == content
 
     def test_save_bytes_to_private_bucket(self, s3_adapter):

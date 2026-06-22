@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi.responses import Response
+from openpyxl import Workbook, load_workbook
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
@@ -21,7 +23,6 @@ from app.schemas.common import (
     AuthUser,
 )
 from app.services import admin_public_course_service as service
-from openpyxl import load_workbook
 
 router = APIRouter(prefix="/public-courses", tags=["admin-public-courses"])
 
@@ -180,6 +181,45 @@ def get_public_questions(
     return success([_format_question(question) for question in service.list_public_questions(db, course_id)])
 
 
+def _build_admin_question_template(question_type: str) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "公共题目导入模板"
+    ws.append(["题型", "标签", "题干", "选项（选择题用 | 分隔）", "答案", "解析"])
+    if question_type == "choice":
+        ws.append(["choice", "人工智能,基础", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
+    elif question_type == "fill":
+        ws.append(["fill", "通识常识", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
+    elif question_type == "multi_choice":
+        ws.append(["multi_choice", "编程基础|多选", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
+    else:
+        ws.append(["choice", "人工智能,基础", "图灵测试由谁提出？", "A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦", "A", "图灵提出了图灵测试。"])
+        ws.append(["fill", "通识常识", "中国的首都是哪里？", "", "北京", "填空题直接填写答案关键词。"])
+        ws.append(["multi_choice", "编程基础|多选", "以下哪些是编程语言？", "A. Python|B. Java|C. HTML|D. C++", "ABD", "HTML 是标记语言，不是编程语言。"])
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+@router.get("/questions/import/template", summary="下载公共题目导入模板", description="管理员：下载不含课程名称列的公共题目 Excel 批量导入模板")
+def download_public_question_template(
+    template_type: str = Query("all", pattern="^(all|choice|fill|multi_choice)$"),
+    _: AuthUser = Depends(require_role("admin")),
+):
+    content = _build_admin_question_template(template_type)
+    filename_map = {
+        "choice": "admin-choice-question-template.xlsx",
+        "fill": "admin-fill-question-template.xlsx",
+        "multi_choice": "admin-multi-choice-question-template.xlsx",
+        "all": "admin-question-template.xlsx",
+    }
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_map[template_type]}"'},
+    )
+
+
 @router.post("/{course_id}/questions", summary="新增公共课程题目", description="管理员：新增题目并同步教师副本")
 def add_public_question(
     course_id: int,
@@ -215,7 +255,6 @@ def import_public_questions(
     headers = [str(c.value).strip() if c.value is not None else "" for c in next(ws.iter_rows(min_row=1, max_row=1))]
     required_header_groups = [
         ("题型", ["题型", "type"]),
-        ("课程名称", ["课程名称", "课程", "course", "course_name"]),
         ("题干", ["题干", "stem"]),
         ("答案", ["答案", "answer"]),
     ]

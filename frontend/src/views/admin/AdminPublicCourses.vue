@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Material } from '../../api/material'
 import type { Question } from '../../api/question'
-import { downloadQuestionTemplate } from '../../api/question'
 import PdfPreviewDialog from '../../components/common/PdfPreviewDialog.vue'
 import { useUploadWithProgress } from '../../composables/useUploadWithProgress'
 import {
@@ -13,6 +12,7 @@ import {
   deleteAdminPublicCourse,
   deleteAdminPublicMaterial,
   deleteAdminPublicQuestion,
+  downloadAdminQuestionTemplate,
   getAdminPublicCourses,
   getAdminPublicMaterials,
   getAdminPublicQuestions,
@@ -71,6 +71,7 @@ const questionForm = ref({
   optionsText: '',
   answer: '',
   explanation: '',
+  tags: [] as string[],
 })
 
 const selectedCourseId = computed(() => selectedCourse.value?.id || 0)
@@ -292,7 +293,7 @@ async function removeMaterial(material: Material) {
 function openCreateQuestion() {
   if (!selectedCourse.value) return
   editingQuestionId.value = null
-  questionForm.value = { type: 'choice', stem: '', optionsText: '', answer: '', explanation: '' }
+  questionForm.value = { type: 'choice', stem: '', optionsText: '', answer: '', explanation: '', tags: [] }
   showQuestionDialog.value = true
 }
 
@@ -304,6 +305,7 @@ function openEditQuestion(question: Question) {
     optionsText: (question.options || []).join('\n'),
     answer: question.answer,
     explanation: question.explanation || '',
+    tags: [...(question.tags || [])],
   }
   showQuestionDialog.value = true
 }
@@ -330,6 +332,7 @@ async function saveQuestion() {
       options,
       answer: questionForm.value.answer.trim(),
       explanation: questionForm.value.explanation.trim(),
+      tags: questionForm.value.tags.map(item => item.trim()).filter(Boolean),
     }
     if (editingQuestionId.value) {
       await updateAdminPublicQuestion(selectedCourse.value.id, editingQuestionId.value, payload)
@@ -383,14 +386,14 @@ function triggerDownload(blob: Blob, filename: string) {
 
 async function handleDownloadTemplate() {
   try {
-    const blob = await downloadQuestionTemplate(templateType.value)
+    const blob = await downloadAdminQuestionTemplate(templateType.value)
     const filenameMap: Record<string, string> = {
-      choice: 'choice-question-template.xlsx',
-      fill: 'fill-question-template.xlsx',
-      multi_choice: 'multi-choice-question-template.xlsx',
-      all: 'question-template.xlsx',
+      choice: 'admin-choice-question-template.xlsx',
+      fill: 'admin-fill-question-template.xlsx',
+      multi_choice: 'admin-multi-choice-question-template.xlsx',
+      all: 'admin-question-template.xlsx',
     }
-    triggerDownload(blob as Blob, filenameMap[templateType.value] || 'question-template.xlsx')
+    triggerDownload(blob as Blob, filenameMap[templateType.value] || 'admin-question-template.xlsx')
   } catch {
     ElMessage.error('模板下载失败，请稍后重试')
   }
@@ -616,6 +619,17 @@ onMounted(() => fetchCourses())
         <el-form-item label="答案" required>
           <el-input v-model="questionForm.answer" placeholder="请输入标准答案" clearable />
         </el-form-item>
+        <el-form-item label="课程标签">
+          <el-select
+            v-model="questionForm.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入标签后回车"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="解析">
           <el-input v-model="questionForm.explanation" type="textarea" :rows="3" placeholder="选填" />
         </el-form-item>
@@ -639,15 +653,15 @@ onMounted(() => fetchCourses())
         <p>请先选择模板类型并下载，再按模板填写后上传。</p>
         <table class="format-table">
           <thead>
-            <tr><th>题型</th><th>题干</th><th>选项（选择题用 | 分隔）</th><th>答案</th><th>解析</th></tr>
+            <tr><th>题型</th><th>标签</th><th>题干</th><th>选项（选择题用 | 分隔）</th><th>答案</th><th>解析</th></tr>
           </thead>
           <tbody>
-            <tr><td>choice</td><td>图灵测试由谁提出？</td><td>A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦</td><td>A</td><td>图灵提出了图灵测试。</td></tr>
-            <tr><td>multi_choice</td><td>以下哪些是编程语言？</td><td>A. Python|B. Java|C. HTML|D. C++</td><td>ABD</td><td>HTML 是标记语言，不是编程语言。</td></tr>
-            <tr><td>fill</td><td>中国的首都是哪里？</td><td></td><td>北京</td><td>填空题直接填写答案关键词。</td></tr>
+            <tr><td>choice</td><td>人工智能,基础</td><td>图灵测试由谁提出？</td><td>A. 图灵|B. 冯·诺依曼|C. 乔布斯|D. 爱因斯坦</td><td>A</td><td>图灵提出了图灵测试。</td></tr>
+            <tr><td>multi_choice</td><td>编程基础|多选</td><td>以下哪些是编程语言？</td><td>A. Python|B. Java|C. HTML|D. C++</td><td>ABD</td><td>HTML 是标记语言，不是编程语言。</td></tr>
+            <tr><td>fill</td><td>通识常识</td><td>中国的首都是哪里？</td><td></td><td>北京</td><td>填空题直接填写答案关键词。</td></tr>
           </tbody>
         </table>
-        <p class="import-note">"题型"支持 choice、multi_choice 和 fill。多选题答案列填写排序后的字母组合，如 ABD。导入后会自动同步到教师副本。</p>
+        <p class="import-note">管理员导入会使用当前选中的公共课程，不需要填写课程名称；"标签"支持用逗号、顿号、|、/ 或分号分隔多个标签；"题型"支持 choice、multi_choice 和 fill。多选题答案列填写排序后的字母组合，如 ABD。导入后会自动同步到教师副本。</p>
       </div>
       <div class="import-actions">
         <div class="template-block">

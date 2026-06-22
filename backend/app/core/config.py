@@ -33,6 +33,10 @@ class Settings:
     access_token_expire_minutes: int = _env_int("ACCESS_TOKEN_EXPIRE_MINUTES", default=10080)
     allowed_origins: str = _env("ALLOWED_ORIGINS", default="*")
     database_url: str = _env("DATABASE_URL", default="mysql+pymysql://root:123456@127.0.0.1:3306/tongshi?charset=utf8mb4")
+    db_pool_size: int
+    db_max_overflow: int
+    db_pool_recycle: int
+    db_pool_timeout: int
     allow_query_token_for_files: bool = _env("ALLOW_QUERY_TOKEN_FOR_FILES", default="false").lower() == "true"
     storage_backend: str = _env("STORAGE_BACKEND", default="local").lower()
     local_upload_dir: str = _env("LOCAL_UPLOAD_DIR", default=str(BACKEND_ROOT / "uploads"))
@@ -45,6 +49,10 @@ class Settings:
     s3_force_path_style: bool = _env("S3_FORCE_PATH_STYLE", default="true").lower() == "true"
 
     def __init__(self):
+        self.db_pool_size = _env_int("DB_POOL_SIZE", default=5)
+        self.db_max_overflow = _env_int("DB_MAX_OVERFLOW", default=5)
+        self.db_pool_recycle = _env_int("DB_POOL_RECYCLE", default=3600)
+        self.db_pool_timeout = _env_int("DB_POOL_TIMEOUT", default=30)
         if not self.secret_key:
             raise ValueError("SECRET_KEY 未配置，禁止启动")
 

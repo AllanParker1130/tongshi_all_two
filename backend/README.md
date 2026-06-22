@@ -42,6 +42,10 @@ py main.py
 ```env
 SECRET_KEY=请替换为至少32位随机字符串
 DATABASE_URL=mysql+pymysql://root:密码@127.0.0.1:3306/tongshi?charset=utf8mb4
+DB_POOL_SIZE=3
+DB_MAX_OVERFLOW=2
+DB_POOL_RECYCLE=3600
+DB_POOL_TIMEOUT=10
 ALLOW_QUERY_TOKEN_FOR_FILES=false
 ```
 

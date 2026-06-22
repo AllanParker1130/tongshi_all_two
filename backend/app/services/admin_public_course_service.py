@@ -181,6 +181,7 @@ def create_public_question(db: Session, course_id: int, data: dict) -> Question:
     course = _get_public_course(db, course_id)
     if not course:
         raise BusinessException(404, "公共课程不存在")
+    data["tags"] = _normalize_tags(data.get("tags"))
     question = Question(course_id=course.id, **data)
     db.add(question)
     db.flush()
@@ -199,7 +200,7 @@ def update_public_question(db: Session, question_id: int, data: dict) -> Questio
         return None
     for key, value in data.items():
         if value is not None and hasattr(question, key):
-            setattr(question, key, value)
+            setattr(question, key, _normalize_tags(value) if key == "tags" else value)
     sync_question_to_course_copies(db, question)
     db.commit()
     db.refresh(question)

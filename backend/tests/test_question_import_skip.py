@@ -2,6 +2,7 @@
 import io
 
 import openpyxl
+from app.models.entities import Question
 from app.services.question_service import import_questions_from_excel
 
 
@@ -50,6 +51,18 @@ class TestImportDuplicateDetection:
         assert result["skip_count"] == 0
         assert result["fail_count"] == 0
         assert len(result["skips"]) == 0
+
+    def test_import_splits_multiple_tags(self, db_session):
+        """标签列支持用多种分隔符填写多个标签，并去重保存。"""
+        rows = [
+            {"题型": "fill", "课程名称": "测试课程", "标签": "人工智能,基础|人工智能、通识",
+             "题干": "什么是机器学习？", "选项": "", "答案": "算法", "解析": "测试解析"},
+        ]
+        result = import_questions_from_excel(db_session, rows, "T001")
+
+        assert result["success_count"] == 1
+        created = db_session.query(Question).filter(Question.stem == "什么是机器学习？").one()
+        assert created.tags == ["人工智能", "基础", "通识"]
 
     def test_mixed_new_and_duplicate(self, db_session):
         """混合导入：新题目成功，重复题目跳过。"""

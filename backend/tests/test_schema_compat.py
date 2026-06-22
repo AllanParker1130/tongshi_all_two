@@ -102,6 +102,21 @@ def test_settings_reads_seaweedfs_s3_config(monkeypatch):
     assert settings.s3_force_path_style is True
 
 
+def test_settings_reads_database_pool_config(monkeypatch):
+    """数据库连接池参数应可通过环境变量按服务器规格调整。"""
+    monkeypatch.setenv("DB_POOL_SIZE", "3")
+    monkeypatch.setenv("DB_MAX_OVERFLOW", "2")
+    monkeypatch.setenv("DB_POOL_RECYCLE", "1800")
+    monkeypatch.setenv("DB_POOL_TIMEOUT", "10")
+
+    settings = Settings()
+
+    assert settings.db_pool_size == 3
+    assert settings.db_max_overflow == 2
+    assert settings.db_pool_recycle == 1800
+    assert settings.db_pool_timeout == 10
+
+
 def test_s3_storage_adapter_uses_path_style_for_seaweedfs(monkeypatch):
     """SeaweedFS S3 网关应使用 path-style addressing"""
     monkeypatch.setattr("app.services.storage_s3.settings.s3_endpoint", "http://localhost:8333")

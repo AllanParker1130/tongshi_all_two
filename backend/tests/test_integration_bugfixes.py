@@ -22,6 +22,21 @@ def _build_student_import_file(rows: list[list[str]]) -> io.BytesIO:
     return buffer
 
 
+def _build_question_import_file(headers: list[str], rows: list[list[str]]) -> io.BytesIO:
+    """构造题库导入接口使用的 Excel 文件。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
 class TestTeacherRefactor:
     """覆盖课程锚定、教师隔离、班级和发布题目核心行为。"""
 
@@ -285,6 +300,120 @@ class TestTeacherRefactor:
         teacher_delete = client.delete(f"/api/questions/{mirrored.id}", headers=auth_header(teacher_token))
         assert teacher_delete.json()["code"] == 400
         assert "公共课程同步内容" in teacher_delete.json()["message"]
+
+    def test_admin_public_question_tags_are_normalized_and_synced_to_teacher_copy(
+        self,
+        client,
+        db_session,
+        teacher_token,
+    ):
+        admin_token = client.post(
+            "/api/token", json={"id": "admin", "password": "Admin#2026"}).json()["data"]["access_token"]
+        course_resp = client.post(
+            "/api/admin/public-courses",
+            json={"name": "公共题目标签课程"},
+            headers=auth_header(admin_token),
+        )
+        public_course_id = course_resp.json()["data"]["id"]
+        copy_resp = client.post(f"/api/questions/courses/{public_course_id}/add", headers=auth_header(teacher_token))
+        copy_id = copy_resp.json()["data"]["id"]
+
+        create_resp = client.post(
+            f"/api/admin/public-courses/{public_course_id}/questions",
+            json={
+                "type": "choice",
+                "stem": "标签同步题",
+                "options": ["A", "B"],
+                "answer": "A",
+                "explanation": "",
+                "tags": [" AI ", "基础", "AI"],
+            },
+            headers=auth_header(admin_token),
+        )
+
+        assert create_resp.json()["code"] == 0
+        assert create_resp.json()["data"]["tags"] == ["AI", "基础"]
+        source_question_id = create_resp.json()["data"]["id"]
+        mirrored = db_session.query(Question).filter(
+            Question.course_id == copy_id,
+            Question.source_question_id == source_question_id,
+        ).one()
+        assert mirrored.tags == ["AI", "基础"]
+
+        update_resp = client.put(
+            f"/api/admin/public-courses/{public_course_id}/questions/{source_question_id}",
+            json={
+                "type": "choice",
+                "stem": "标签同步题",
+                "options": ["A", "B"],
+                "answer": "B",
+                "explanation": "",
+                "tags": ["进阶", "基础", "进阶"],
+            },
+            headers=auth_header(admin_token),
+        )
+
+        assert update_resp.json()["code"] == 0
+        assert update_resp.json()["data"]["tags"] == ["进阶", "基础"]
+        db_session.refresh(mirrored)
+        assert mirrored.tags == ["进阶", "基础"]
+
+    def test_admin_import_public_questions_uses_selected_course_and_splits_tags(
+        self,
+        client,
+        db_session,
+        teacher_token,
+    ):
+        admin_token = client.post(
+            "/api/token", json={"id": "admin", "password": "Admin#2026"}).json()["data"]["access_token"]
+        course_resp = client.post(
+            "/api/admin/public-courses",
+            json={"name": "公共导入标签课程"},
+            headers=auth_header(admin_token),
+        )
+        public_course_id = course_resp.json()["data"]["id"]
+        copy_resp = client.post(f"/api/questions/courses/{public_course_id}/add", headers=auth_header(teacher_token))
+        copy_id = copy_resp.json()["data"]["id"]
+        excel = _build_question_import_file(
+            ["题型", "标签", "题干", "选项（选择题用 | 分隔）", "答案", "解析"],
+            [["choice", "人工智能,基础|多选", "公共导入标签题", "A. 对|B. 错", "A", "解析"]],
+        )
+
+        resp = client.post(
+            f"/api/admin/public-courses/{public_course_id}/questions/import",
+            files={"file": ("questions.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_header(admin_token),
+        )
+
+        data = resp.json()
+        assert data["code"] == 0
+        assert data["data"]["success_count"] == 1
+        assert data["data"]["fail_count"] == 0
+        source = db_session.query(Question).filter(
+            Question.course_id == public_course_id,
+            Question.stem == "公共导入标签题",
+        ).one()
+        assert source.tags == ["人工智能", "基础", "多选"]
+        mirrored = db_session.query(Question).filter(
+            Question.course_id == copy_id,
+            Question.source_question_id == source.id,
+        ).one()
+        assert mirrored.tags == ["人工智能", "基础", "多选"]
+
+    def test_admin_public_question_template_omits_course_name_column(self, client):
+        admin_token = client.post(
+            "/api/token", json={"id": "admin", "password": "Admin#2026"}).json()["data"]["access_token"]
+
+        resp = client.get(
+            "/api/admin/public-courses/questions/import/template",
+            headers=auth_header(admin_token),
+        )
+
+        assert resp.status_code == 200
+        workbook = __import__("openpyxl").load_workbook(io.BytesIO(resp.content))
+        headers = [cell.value for cell in next(workbook.active.iter_rows(min_row=1, max_row=1))]
+        assert headers == ["题型", "标签", "题干", "选项（选择题用 | 分隔）", "答案", "解析"]
+        assert "课程名称" not in headers
 
     def test_teacher_cannot_delete_synced_material(self, client, db_session, teacher_token):
         admin_token = client.post(
